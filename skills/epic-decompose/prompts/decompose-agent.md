@@ -352,7 +352,7 @@ If an Investigation epic has ≤3 bounded outcomes that change downstream struct
 
 1. **Every branch file MUST set `branch` and `gated_by` in frontmatter** (in addition to the normal epic fields), plus `gate_failure_impact`:
    - `branch=<letter>` — the outcome label, matching the `-BRANCH-<letter>-` in the filename (`branch=A` for `{ID}-BRANCH-A-E003.md`).
-   - `gated_by={ID}-E001` — the `epic_id` of the **main-plan Investigation** whose outcome selects this branch (must be a real main-plan epic).
+   - `gated_by={ID}-E001` — the `epic_id` of the **main-plan Investigation** whose outcome selects this branch (must be a real main-plan epic). It **MUST also appear in this branch epic's `dependencies`** — `gated_by` is always a member of `dependencies` (the branch cannot start until the Investigation resolves).
    - `gate_failure_impact.action=<rewrite|remove|add_remediation> gate_failure_impact.fallback_approach="<text>"`.
 
    ```bash
@@ -360,13 +360,13 @@ If an Investigation epic has ≤3 bounded outcomes that change downstream struct
        epic_id="{ID}-BRANCH-A-E003" title="<title>" parent_strat="{ID}" \
        component="<canonical name>" team="<owner team>" \
        type=Implementation priority=P0 \
-       branch=A gated_by="{ID}-E001" \
+       branch=A gated_by="{ID}-E001" dependencies="{ID}-E001" \
        gate_failure_impact.action=rewrite \
        gate_failure_impact.fallback_approach="<what changes if outcome A does not hold>" \
        ai_signals.change_specificity=1 ...
    ```
 
-2. **A main-plan epic MUST NOT list a branch epic in its `dependencies`.** Branch epics are not main-plan nodes, so a dependency on one (e.g. main-plan `E004` depending on `BRANCH-A-E003`) resolves to a nonexistent epic. If a downstream unit of work depends on the *outcome* of the Investigation, depend on / `gated_by` the **Investigation epic** ({ID}-E001), not on a branch outcome. If it depends on a *specific* branch's work, it belongs **inside that branch** (as another `-BRANCH-<letter>-` epic), not in the main plan. A branch epic's own `dependencies` may reference the shared Investigation and sibling epics within the same branch.
+2. **A main-plan epic MUST NOT list a branch epic in its `dependencies`.** Branch epics are not main-plan nodes, so a dependency on one (e.g. main-plan `E004` depending on `BRANCH-A-E003`) resolves to a nonexistent epic. If a downstream unit of work depends on the *outcome* of the Investigation, depend on / `gated_by` the **Investigation epic** ({ID}-E001), not on a branch outcome. If it depends on a *specific* branch's work, it belongs **inside that branch** (as another `-BRANCH-<letter>-` epic), not in the main plan. A branch epic's own `dependencies` MUST include the gating Investigation (its `gated_by`) and may also reference sibling epics within the same branch.
 
 Document branches in the decomposition summary. Branch epics are excluded from the main-plan critical path; `epic_count` may count either main-plan epics only or all epics including branches.
 
