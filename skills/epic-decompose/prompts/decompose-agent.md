@@ -368,6 +368,8 @@ If an Investigation epic has ≤3 bounded outcomes that change downstream struct
 
 2. **A main-plan epic MUST NOT list a branch epic in its `dependencies`.** Branch epics are not main-plan nodes, so a dependency on one (e.g. main-plan `E004` depending on `BRANCH-A-E003`) resolves to a nonexistent epic. If a downstream unit of work depends on the *outcome* of the Investigation, depend on / `gated_by` the **Investigation epic** ({ID}-E001), not on a branch outcome. If it depends on a *specific* branch's work, it belongs **inside that branch** (as another `-BRANCH-<letter>-` epic), not in the main plan. A branch epic's own `dependencies` MUST include the gating Investigation (its `gated_by`) and may also reference sibling epics within the same branch.
 
+Otherwise, write each branch epic **exactly like a main-plan epic (Step 8b)** — the same body sections (Description / Scope / Acceptance Criteria / HLR Traceability) **and its own separate signal-rationale file** `{ID}-BRANCH-<letter>-ENNN-ai-signals.md` (Step 6, one per branch epic) — in addition to the branch-specific frontmatter above. A branch epic missing its `-ai-signals.md` file fails the same artifact contract as a main-plan epic.
+
 Document branches in the decomposition summary. Branch epics are excluded from the main-plan critical path; `epic_count` may count either main-plan epics only or all epics including branches.
 
 Do not return a summary. Your work is complete when the decomposition summary and all epic files exist in `artifacts/epic-tasks/`.
