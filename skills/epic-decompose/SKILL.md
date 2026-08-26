@@ -7,6 +7,12 @@ allowed-tools: Glob, Bash, Agent
 
 You are a non-interactive epic decomposition pipeline. Do not ask questions or wait for confirmation. Make all decisions autonomously.
 
+## Turn Discipline (critical)
+
+You run headless. **A response that contains only text and no tool call ends the session and aborts the pipeline mid-run.** Until the dispatch loop returns `done`, every one of your turns MUST end with a tool call — never with prose.
+
+In particular, after you launch a wave's Agent(s), do **not** write narration such as "the agent is running, waiting for it to complete." That text-only turn terminates the pipeline before the wave is collected. Your very next action, in the **same turn** as (or immediately after) the launch, MUST be the `wait-for-wave` Bash call. Do not describe what you are about to do — do it. Save any commentary for after the pipeline reaches `DONE`.
+
 ## Setup
 
 Parse `$ARGUMENTS` for:
@@ -88,14 +94,14 @@ Parse the YAML output for: `action`, `phase`, `message`, `agents`.
 - `vars` are pre-rendered KEY=VALUE lines with `{ID}` already substituted.
 - Launch as background Agent (with `subagent_type` if present).
 
-Then wait for completion:
+Immediately wait for completion. **Do not end your turn or emit any text after launching — your next tool call MUST be `wait-for-wave`:**
 
 ```bash
 python3 scripts/pipeline_state.py wait-for-wave
 ```
 
 On exit 0 (complete): go to step 1.
-On exit 3 (still pending): re-run `python3 scripts/pipeline_state.py wait-for-wave`.
+On exit 3 (still pending): re-run `python3 scripts/pipeline_state.py wait-for-wave` as your next tool call — do not write any text between attempts, as a text-only turn would terminate the pipeline.
 Any other exit code is an error.
 
 ### Example `launch_wave` output

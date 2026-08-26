@@ -119,7 +119,7 @@ Apply these rules to construct edges between epics:
 7. `license-validation` ∥ `repo-onboarding` parallel (independent inputs)
 8. `license-validation` ∥ `konflux-onboarding` parallel (config doesn't depend on specific deps)
 9. `license-validation` → general implementation serial (if licenses fail, deps change, affects approach)
-10. `konflux-onboarding` ∥ general implementation parallel (config independent of code; AC gates first execution)
+10. `konflux-onboarding` ∥ general implementation parallel (config independent of code; AC gates first execution). **Add NO blocking edge in either direction.** It is tempting to make the general implementation depend on `konflux-onboarding` ("the code needs a build pipeline first") — do not. That coupling is enforced by the Rule 25 "build pipeline green" AC on the general implementation epic, never by a DAG dependency. A `konflux-onboarding → general` edge serializes work that must run in parallel and is a rule violation.
 11. `docs-authoring` blocked by ALL Implementation epics in strategy (always last; docs describe what was built). These edges do not trigger priority inheritance — see Step 4 `docs-authoring` priority exception.
 
 ### Implementation → Implementation Edges
