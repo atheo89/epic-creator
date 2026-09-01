@@ -1,0 +1,35 @@
+strat_id: RHAISTRAT-9010
+strategy_title: Audit logging for model inference traffic
+strategy_markdown: |
+  ## Problem Statement
+
+  Financial-services customers cannot pass compliance reviews because inference
+  traffic on RHOAI leaves no audit trail: there is no record of who invoked which
+  model endpoint, when, and with what outcome. Auditors require tamper-evident,
+  structured audit events for every inference request. Without this, two
+  strategic renewals are at risk this fiscal year.
+
+  ## High-Level Requirements
+
+  | ID | Priority | Requirement |
+  |-------|----------|-------------|
+  | HLR-1 | P0 | Every inference request through a KServe endpoint emits an audit event capturing caller identity, model/version, timestamp, and response status (not payloads). |
+  | HLR-2 | P0 | Audit events are delivered to the cluster audit sink with at-least-once semantics and are not lost on component restart. |
+  | HLR-3 | P1 | Administrators can enable/disable inference auditing per project from the Dashboard. |
+  | HLR-4 | P2 | A common audit event schema is defined and published so future components (pipelines, workbenches) emit compatible events. Note: the schema in this item is the format HLR-1's events must conform to — HLR-1 cannot ship before the schema is settled. |
+  | HLR-5 | P2 | Documentation covers enabling auditing and interpreting events. |
+
+  ## Affected Components
+
+  - KServe
+  - Dashboard
+
+  ## Out of Scope
+
+  - Auditing of non-inference traffic (pipeline runs, notebook activity) — future
+    strategies will adopt the HLR-4 schema
+  - Long-term audit storage and retention tooling (customer-provided)
+
+  ## Open Questions
+
+  None — the audit sink interface is the standard cluster logging forwarder.

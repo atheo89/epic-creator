@@ -1,0 +1,139 @@
+strat_id: RHAISTRAT-8006
+tier: real
+notes: "REAL strategy snapshot (tier: real). Anonymized verbatim body from a closed,\nCritical-priority,\
+  \ refined RHAISTRAT; not authored for this eval.\n\nShape: ~27.5k characters of description, 9 High\
+  \ Level Requirements\n(5x P0, 3x P1, 1x P2), effort estimate L (6-9 sprints). Four affected\ncomponents\
+  \ spanning three delivery surfaces plus QE and Docs: an upstream\noperator repo and a companion sidecar/extensions\
+  \ repo (build-pipeline\nonboarding, FIPS-compliant Go builds, midstream fork setup), the platform\n\
+  meta-operator (a new DSC-managed component controller, CRD, kustomize\nmanifest integration, OLM/CSV\
+  \ packaging), and the dashboard (a Module\nFederation BFF plugin plus a feature flag). The strategy\
+  \ is explicitly a\n*productization* of functionality that already exists upstream: runtime\nbehaviour\
+  \ is out of scope and is tracked in four sibling RFEs. It also\ncarries a large explicit Out-of-Scope\
+  \ list, 6 named risks, 6 assumptions\n(most marked \"needs validation\"), 5 open questions with named\
+  \ owner teams,\nand a table of 7 unresolved human process gates.\n\nBecause this is real data there\
+  \ is NO curated ground-truth decomposition.\nDo not grade against a single expected DAG. Instead check\
+  \ the following:\n\n- Team/ownership split: the components map onto at least three distinct\n  delivery\
+  \ teams (upstream/operator, platform operator, dashboard) plus QE\n  and Docs. Epics that fuse work\
+  \ owned by different teams into one unit, or\n  that shard a single team's contiguous work into many\
+  \ trivial epics, are\n  both suspect.\n- Work-product split: build/packaging work (image pipeline onboarding,\
+  \ OLM\n  CSV entries, disconnected image references) is a different work product\n  from controller\
+  \ code and from UI/BFF code, and should not be merged.\n- Dependency ordering: images must exist before\
+  \ the component controller\n  and CSV can reference them by pinned digest; the dashboard feature flag\n\
+  \  depends on the component being representable in the cluster CR. A DAG\n  that runs all of these fully\
+  \ in parallel with no edges is under-modelling\n  the sequencing; a fully serial chain over-constrains\
+  \ it.\n- Investigations: several assumptions are self-labelled \"needs validation\"\n  and the top risk\
+  \ is upstream functional gaps that would change the effort\n  estimate a whole size band. A good decomposition\
+  \ should surface at least\n  one time-boxed validation/gap-analysis unit early, and should make the\n\
+  \  downstream epics conditional on it rather than silently assuming success.\n- Docs work is explicitly\
+  \ required (installation/upgrade documentation for\n  enabling the component, plus an image-contract/authoring\
+  \ guide implied by\n  the acceptance criteria). Docs must appear as real work, not be folded\n  invisibly\
+  \ into engineering epics.\n- Lifecycle/teardown is a first-class requirement (disable path must garbage\n\
+  \  collect every owned resource, including cross-namespace user CRs, which is\n  itself an open question).\
+  \ Watch for decompositions that only cover the\n  happy-path install.\n- Cross-cutting NFRs (FIPS build\
+  \ flags, container hardening, disconnected /\n  air-gapped installation) apply to every image and should\
+  \ generally be\n  acceptance criteria on the owning epics rather than a standalone\n  \"NFR epic\" -\
+  \ flag it if a grader sees one without justification.\n- Cross-strategy dependency: two sibling strategies\
+  \ target the same upstream\n  codebase, and the runtime feature set lives in separate RFEs. Epics that\n\
+  \  re-import that out-of-scope runtime work are scope creep.\n- Tech Preview framing: the component\
+  \ is opt-in and disabled by default, and\n  UI scope is deliberately read-only. Decompositions that\
+  \ build the full\n  management UI are over-scoped.\n"
+
+# Canonical Jira component vocabulary shipped to this case as
+# .context/rhai-components.txt. Mirrored here because check judges only
+# receive outputs + annotations, and .context is provisioned input rather
+# than a collected output. Epic frontmatter 'component' must be one of these
+# (decompose-agent.md:61; submit.py validate_component strips anything else).
+valid_components:
+  - AI Core Dashboard
+  - AI Core Platform
+  - AI Core Platform Security
+  - AI Evaluations
+  - AI Guardrails
+  - AI Hub
+  - AI Navigator
+  - AI Pipelines
+  - AI Platform DevOps
+  - AI Research + Community
+  - AI Safety
+  - AI Safety Orchestration
+  - AI Testing + Workflow Validation
+  - AIPCC Ecosystems
+  - AIPCC Productization
+  - Accelerator Enablement
+  - AgentDev
+  - AgentOps
+  - Agentic
+  - AutoML
+  - AutoRAG
+  - Build and Release
+  - CI/CD
+  - Compressed-Tensors
+  - Customer Exploration & Test
+  - Data Connect Hub
+  - Data Processing
+  - DevOps
+  - Distributed Workloads
+  - Documentation
+  - Feature Store
+  - Fine Tuning
+  - Gen AI Studio
+  - IBM P
+  - IBM Z
+  - INFERENG Midstream
+  - Inference Extensions
+  - Inference Gateway
+  - Inference Research
+  - Inference-Time Techniques
+  - Infra Midstream
+  - InfraOps
+  - Integrations
+  - KubeRay
+  - Kubeflow Spark Operator
+  - Kubeflow Unified SDK
+  - LLM Compressor
+  - LlamaStack
+  - MLR Speculative Decoding
+  - MLflow
+  - Model Customization
+  - Model Runtimes
+  - Model Validation
+  - Model and Agent Observability
+  - Model as a Service
+  - Monitoring
+  - Notebooks
+  - Notebooks Extensions
+  - Notebooks Images
+  - Notebooks Server
+  - OCPMCPLO
+  - OGX Core
+  - OpenShift AI Productization
+  - Optimized Models
+  - PXE
+  - PerfScale
+  - Performance Infrastructure
+  - Performance Marketing
+  - Performance Research
+  - PyTorch
+  - QE
+  - RAG
+  - RAG + Vector DB
+  - RAG_Agentic
+  - Ray Training
+  - SDG
+  - Security
+  - Serving Orchestration
+  - Speculators
+  - TestOps
+  - Tooling Experience
+  - Training Hub
+  - Training Kubeflow
+  - UXD
+  - Wheel Building
+  - Wheel Package Index
+  - Workbenches/IDE
+  - Workload Orchestration
+  - llama.cpp
+  - llm-d
+  - vLLM
+  - vLLM Runtime
+  - watsonx Orchestrate Collaboration

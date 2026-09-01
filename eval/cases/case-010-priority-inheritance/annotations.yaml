@@ -1,0 +1,31 @@
+strat_id: RHAISTRAT-9010
+tier: synthetic
+notes: |
+  Priority-inheritance trap: HLR-4 (audit event schema) is labeled P2 in the
+  strategy, but the P0 work (HLR-1) explicitly cannot ship before the schema
+  is settled. The epic carrying the schema work therefore blocks P0 work and
+  must inherit P0 priority, and HLR-1's epic must depend on it. Keeping the
+  schema epic at P2 while P0 epics depend on it is the specific failure this
+  case probes (decomposition_quality dimension 1). Also expect the
+  rule-mandated rollback/feature-flag acceptance criterion on the KServe
+  auditing epic (it changes serving request handling) and docs last.
+
+# Canonical Jira component vocabulary shipped to this case as
+# .context/rhai-components.txt. Mirrored here because check judges only
+# receive outputs + annotations, and .context is provisioned input rather
+# than a collected output. Epic frontmatter 'component' must be one of these
+# (decompose-agent.md:61; submit.py validate_component strips anything else).
+valid_components:
+  - Dashboard
+  - Data Science Pipelines
+  - Distributed Workloads
+  - Documentation
+  - Feature Store
+  - KServe
+  - Llama Stack
+  - Model Registry
+  - Notebooks
+  - Platform Operator
+  - Serving Runtimes
+  - Training Operator
+  - TrustyAI

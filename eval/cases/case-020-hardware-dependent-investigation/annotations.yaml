@@ -1,0 +1,33 @@
+strat_id: RHAISTRAT-9020
+tier: synthetic
+notes: |
+  Investigation-signal extremes probe: the validation campaign (HLR-1)
+  requires physical AMD Instinct hardware that does not exist in CI, so its
+  Investigation epic should score cluster_hardware_dependence at the -2
+  minimum with local_runnability 0 — an honestly LOW-viability investigation
+  that nonetheless gates productization (HLR-2 gated_by it, with complete
+  gate_failure_impact). The serving-runtimes architecture context states only
+  CUDA builds are productized (architecture_claims material). Upstream ROCm
+  cadence is AMD-controlled: expect external_dependency negative on the
+  runtime productization epics. Pretending the validation is locally runnable
+  or hardware-independent is the probed failure.
+
+# Canonical Jira component vocabulary shipped to this case as
+# .context/rhai-components.txt. Mirrored here because check judges only
+# receive outputs + annotations, and .context is provisioned input rather
+# than a collected output. Epic frontmatter 'component' must be one of these
+# (decompose-agent.md:61; submit.py validate_component strips anything else).
+valid_components:
+  - Dashboard
+  - Data Science Pipelines
+  - Distributed Workloads
+  - Documentation
+  - Feature Store
+  - KServe
+  - Llama Stack
+  - Model Registry
+  - Notebooks
+  - Platform Operator
+  - Serving Runtimes
+  - Training Operator
+  - TrustyAI

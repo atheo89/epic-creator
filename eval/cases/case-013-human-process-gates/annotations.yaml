@@ -1,0 +1,31 @@
+strat_id: RHAISTRAT-9013
+tier: synthetic
+notes: |
+  Probes honest AI-implementability scoring under human and third-party
+  process gates. The evidence-package epic (HLR-2) runs through a security
+  review board and an external certification lab — expect human_process_gates
+  and external_dependency scored negative with rationales saying so, yielding
+  Low (or at best Medium) ai_implementability. Uniformly High scores across
+  this decomposition mean the signals were not honestly assessed. The CI
+  gating epic (HLR-3), by contrast, is automatable and may legitimately score
+  High — a spread between the two epics is the expected signature.
+
+# Canonical Jira component vocabulary shipped to this case as
+# .context/rhai-components.txt. Mirrored here because check judges only
+# receive outputs + annotations, and .context is provisioned input rather
+# than a collected output. Epic frontmatter 'component' must be one of these
+# (decompose-agent.md:61; submit.py validate_component strips anything else).
+valid_components:
+  - Dashboard
+  - Data Science Pipelines
+  - Distributed Workloads
+  - Documentation
+  - Feature Store
+  - KServe
+  - Llama Stack
+  - Model Registry
+  - Notebooks
+  - Platform Operator
+  - Serving Runtimes
+  - Training Operator
+  - TrustyAI

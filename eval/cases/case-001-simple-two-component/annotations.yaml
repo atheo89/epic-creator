@@ -1,0 +1,27 @@
+strat_id: RHAISTRAT-9001
+tier: synthetic
+notes: |
+  Simple two-component strategy; all named components are in the platform.
+  Expect a small DAG (roughly 2-4 epics): KServe-side status surfacing,
+  Dashboard UI consumption, and a docs-authoring epic last (HLR-5). No triage
+  expected. HLR-1/HLR-2 are P0 and must both be traceable.
+
+# Canonical Jira component vocabulary shipped to this case as
+# .context/rhai-components.txt. Mirrored here because check judges only
+# receive outputs + annotations, and .context is provisioned input rather
+# than a collected output. Epic frontmatter 'component' must be one of these
+# (decompose-agent.md:61; submit.py validate_component strips anything else).
+valid_components:
+  - Dashboard
+  - Data Science Pipelines
+  - Distributed Workloads
+  - Documentation
+  - Feature Store
+  - KServe
+  - Llama Stack
+  - Model Registry
+  - Notebooks
+  - Platform Operator
+  - Serving Runtimes
+  - Training Operator
+  - TrustyAI

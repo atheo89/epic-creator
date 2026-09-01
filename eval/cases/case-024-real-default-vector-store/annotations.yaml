@@ -1,0 +1,144 @@
+strat_id: RHAISTRAT-8004
+tier: real
+# Staff Engineer / SME Input section carries substantive technical content
+# (not template placeholder text), so the Step 1.5 override obligation
+# applies. Gates the sme_input_fidelity judge (eval.yaml `if:`).
+sme_substantive: true
+notes: "REAL strategy snapshot (tier: real). Because this is real data there is NO\ncurated ground-truth\
+  \ decomposition — treat everything below as things to\ncheck in a candidate decomposition, not as a\
+  \ single expected answer.\n\nShape: ~10.4k characters of description, Blocker priority, no effort\n\
+  estimate, and ZERO enumerated high-level requirements. The full strategy\nbody exceeded Jira's description\
+  \ limit and lives in an attachment that is\nnot part of this snapshot, so the decomposition must be\
+  \ derived from the\nproblem statement, six acceptance criteria, three success criteria, two open\nquestions,\
+  \ and a long staff-engineer input section. Named components are the\ndashboard, the Gen AI Studio experience\
+  \ layer, and UXD; the technical surface\nspans the dashboard BFF, an operator layer that does not exist\
+  \ yet, an\nupstream (non-Red-Hat-controlled) distribution operator, and a\nself-provisioned relational\
+  \ database used as the vector backend.\n\nThings a grader should watch for:\n\n- Scope derivation without\
+  \ HLRs. With no enumerated requirements, the risk is\n  hallucinated scope. Epics should trace to acceptance\
+  \ criteria and staff\n  input, not to invented requirements.\n- Staff-engineer corrections must win.\
+  \ The input section explicitly\n  invalidates several assumptions and directs work to be removed (a\
+  \ container\n  image build/onboarding stream, storage-migration/upgrade-path work, and\n  strict latency-SLA/index-selection\
+  \ work). Epics that recreate any of those\n  are scope inflation and should be penalised.\n- Explicit\
+  \ descoping of a downstream capability. One capability named in the\n  summary and problem statement\
+  \ is explicitly deferred to a separate\n  in-flight strategy. A decomposition that still produces epics\
+  \ for it is a\n  scope-fidelity failure; conversely the strategy title still mentions it, so\n  watch\
+  \ whether the model notices the conflict and flags it rather than\n  silently picking one reading.\n\
+  - Hard external dependency. Delivery is gated on a separate in-progress\n  strategy that would provide\
+  \ the owning operator. This is a cross-strategy\n  dependency: it belongs in signals/health warnings,\
+  \ NOT in a gated_by\n  pointing at an epic that is not part of this DAG. Also check the model does\n\
+  \  not absorb that other strategy's work into this decomposition.\n- Conditional/fallback branches.\
+  \ Two mutually exclusive fallbacks are\n  described if the dependency slips (bring-your-own database\
+  \ vs.\n  BFF-side provisioning), plus an explicit request for a go/no-go decision\n  gate. A good decomposition\
+  \ expresses this as a decision point or\n  conditional epic, not as two parallel delivery streams both\
+  \ counted as\n  committed scope.\n- Investigations. The two open questions (tenancy/scoping model, migration\n\
+  \  path to a production-grade backend) and the requested baseline benchmark\n  are investigation-shaped,\
+  \ time-boxed work — check they are not dressed up\n  as delivery epics with SLA acceptance criteria\
+  \ (the input explicitly says\n  order-of-magnitude comparison, not thresholds).\n- Team/work-product\
+  \ splits. The component list implies dashboard/BFF\n  engineering plus an operator/platform-provisioning\
+  \ stream plus UXD; the\n  lifecycle concerns called out (cleanup on deletion, pod restarts,\n  credential\
+  \ rotation) are real engineering scope. Check for sensible team\n  splits without over-splitting a mostly\
+  \ single-team change into per-artifact\n  epics.\n- Docs. Nothing in the source mandates documentation,\
+  \ but a user-visible\n  default backend plus a bring-your-own configuration path usually implies\n \
+  \ docs work; a docs epic is reasonable, a docs-only decomposition is not.\n- Multi-tenancy and resource-footprint\
+  \ acceptance criteria (per-namespace\n  isolation, lightweight enough for constrained environments)\
+  \ should appear\n  somewhere in the epic set rather than being dropped as non-functional\n  fluff.\n"
+
+# Canonical Jira component vocabulary shipped to this case as
+# .context/rhai-components.txt. Mirrored here because check judges only
+# receive outputs + annotations, and .context is provisioned input rather
+# than a collected output. Epic frontmatter 'component' must be one of these
+# (decompose-agent.md:61; submit.py validate_component strips anything else).
+valid_components:
+  - AI Core Dashboard
+  - AI Core Platform
+  - AI Core Platform Security
+  - AI Evaluations
+  - AI Guardrails
+  - AI Hub
+  - AI Navigator
+  - AI Pipelines
+  - AI Platform DevOps
+  - AI Research + Community
+  - AI Safety
+  - AI Safety Orchestration
+  - AI Testing + Workflow Validation
+  - AIPCC Ecosystems
+  - AIPCC Productization
+  - Accelerator Enablement
+  - AgentDev
+  - AgentOps
+  - Agentic
+  - AutoML
+  - AutoRAG
+  - Build and Release
+  - CI/CD
+  - Compressed-Tensors
+  - Customer Exploration & Test
+  - Data Connect Hub
+  - Data Processing
+  - DevOps
+  - Distributed Workloads
+  - Documentation
+  - Feature Store
+  - Fine Tuning
+  - Gen AI Studio
+  - IBM P
+  - IBM Z
+  - INFERENG Midstream
+  - Inference Extensions
+  - Inference Gateway
+  - Inference Research
+  - Inference-Time Techniques
+  - Infra Midstream
+  - InfraOps
+  - Integrations
+  - KubeRay
+  - Kubeflow Spark Operator
+  - Kubeflow Unified SDK
+  - LLM Compressor
+  - LlamaStack
+  - MLR Speculative Decoding
+  - MLflow
+  - Model Customization
+  - Model Runtimes
+  - Model Validation
+  - Model and Agent Observability
+  - Model as a Service
+  - Monitoring
+  - Notebooks
+  - Notebooks Extensions
+  - Notebooks Images
+  - Notebooks Server
+  - OCPMCPLO
+  - OGX Core
+  - OpenShift AI Productization
+  - Optimized Models
+  - PXE
+  - PerfScale
+  - Performance Infrastructure
+  - Performance Marketing
+  - Performance Research
+  - PyTorch
+  - QE
+  - RAG
+  - RAG + Vector DB
+  - RAG_Agentic
+  - Ray Training
+  - SDG
+  - Security
+  - Serving Orchestration
+  - Speculators
+  - TestOps
+  - Tooling Experience
+  - Training Hub
+  - Training Kubeflow
+  - UXD
+  - Wheel Building
+  - Wheel Package Index
+  - Workbenches/IDE
+  - Workload Orchestration
+  - llama.cpp
+  - llm-d
+  - vLLM
+  - vLLM Runtime
+  - watsonx Orchestrate Collaboration

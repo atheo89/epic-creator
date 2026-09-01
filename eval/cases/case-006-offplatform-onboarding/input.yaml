@@ -1,0 +1,39 @@
+strat_id: RHAISTRAT-9006
+strategy_title: Feature Store as a supported RHOAI component
+strategy_markdown: |
+  ## Problem Statement
+
+  Customers building recommendation and fraud models ask for a supported feature
+  store; today they self-manage upstream Feast next to the platform with no
+  lifecycle integration, no supported images, and no UI presence. Feast has a
+  Jira component reserved (Feature Store) but is not yet part of the platform:
+  there is no productized repository, no build pipeline, and no operator
+  integration. This strategy brings Feast in as a supported, installable RHOAI
+  component.
+
+  ## High-Level Requirements
+
+  | ID | Priority | Requirement |
+  |-------|----------|-------------|
+  | HLR-1 | P0 | Administrators can enable a supported Feature Store (Feast) through the Platform Operator like any other managed component, with productized images. |
+  | HLR-2 | P1 | Data scientists can reach the feature store from workbenches with the Feast SDK preinstalled in at least one supported workbench image. |
+  | HLR-3 | P1 | The Dashboard shows the Feature Store as an enabled component and links users to its endpoints per project. |
+  | HLR-4 | P2 | Product documentation covers enablement, a getting-started walkthrough, and supported limits. |
+
+  ## Affected Components
+
+  - Feature Store
+  - Dashboard
+  - Platform Operator
+  - Documentation
+
+  ## Out of Scope
+
+  - A feature-authoring UI in the Dashboard (link-out only this release)
+  - Managed offline-store infrastructure — customers bring their own storage
+
+  ## Open Questions
+
+  1. Which Feast deployment topology do we productize first — the operator-based
+     deployment or the standalone server per project? Upstream supports both;
+     supportability differs.

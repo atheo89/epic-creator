@@ -1,0 +1,142 @@
+strat_id: RHAISTRAT-8009
+tier: real
+notes: "REAL strategy snapshot (tier: real). The body is the verbatim refined strategy with\nticket keys\
+  \ re-keyed; there is NO curated ground-truth decomposition for this case.\nGrade it as a set of things\
+  \ to check, not against a single expected DAG.\n\nShape:\n- ~19k characters of strategy body; 8 High\
+  \ Level Requirements (4 x P0, 3 x P1, 1 x P2).\n- Effort estimate M-L (Medium to Large), 4-7 sprints.\
+  \ Well above any triage threshold,\n  so no below-threshold / docs-only triage is expected.\n- Single\
+  \ impacted team, but three distinct code artifacts: the model-tracking server\n  itself, its operator,\
+  \ and a Kubernetes auth/workspace plugin package. Only one of the\n  three appears verbatim in the platform\
+  \ component list, and only two of the three have\n  an architecture-context file.\n- Server-side behaviour\
+  \ change (flag composition + per-request authorization),\n  plugin-level refactoring of unknown depth,\
+  \ and an operator topology change\n  (a second Deployment/Service/HTTPRoute plus traffic routing between\
+  \ them).\n- 5 explicit \"needs validation\" assumptions, 4 Open Questions with named owners,\n  4 Risks\
+  \ with mitigations, 6 proposed acceptance criteria, and 7 process gates all\n  marked \"pending human\
+  \ review\".\n\nThings a grader should watch for:\n- Component-boundary splitting: with a single owning\
+  \ team, the natural split axis is the\n  three code artifacts plus a cross-cutting integration/verification\
+  \ stream, not team\n  boundaries. Epics that fuse server, plugin and operator work into one unit lose\
+  \ the\n  sequencing signal; epics split per-HLR (8 near-identical epics) are over-split.\n- Sequencing\
+  \ / DAG correctness: the plugin's coupling to full server initialization is\n  called out as an early-validation\
+  \ item and as a dependency of the server-side work;\n  the operator's split topology depends on the\
+  \ server accepting the composed flags; the\n  end-to-end multi-tenant and backwards-compatibility verification\
+  \ depends on both.\n  Check the arrows run dependency -> dependent and that nothing is scheduled before\
+  \ the\n  thing it needs.\n- Investigations: at least two Open Questions are genuine unknowns that gate\
+  \ design\n  (an unresolved routing/ingress design decision, and an unquantified per-request\n  latency\
+  \ budget that determines whether caching is in scope at launch). Check they\n  surface as investigation/spike\
+  \ epics or explicit ambiguity flags rather than being\n  silently resolved by the decomposer inventing\
+  \ an answer.\n- SME override: the strategy carries a \"Staff Engineer / SME Input\" section that\n \
+  \ explicitly rejects part of the AI-generated approach (a proposed new CLI flag and CR\n  field) in\
+  \ favour of composing flags that already exist, and re-scopes the operator work\n  from a config toggle\
+  \ to a split deployment. A decomposition that produces an epic for\n  the superseded design, or that\
+  \ keeps the over-specified Kubernetes API mechanics the\n  SME struck, has ignored the highest-priority\
+  \ input in the document.\n- Traceability: all 8 HLRs should map to at least one epic. The single P2\
+  \ (audit logging\n  for authorization denials) is a legitimate candidate for a small trailing epic or\
+  \ an\n  explicit deferral, and its priority should not be inflated to match the P0 work.\n- Docs work:\
+  \ no documentation HLR exists, but the risk mitigations and the operator\n  topology change imply admin-facing\
+  \ configuration documentation and a documented\n  limitation for non-standard storage layouts. Check\
+  \ that any docs epic is scoped to\n  that, and is not invented as a large parallel stream.\n- Process\
+  \ gates: all seven prerequisite gates are \"pending human review\". A decomposition\n  should not assert\
+  \ any of them as satisfied; representing the pending architecture\n  review and documentation-support\
+  \ gates as blocking/process items is reasonable.\n- Backwards compatibility and fail-closed behaviour\
+  \ are P0 requirements with dedicated\n  acceptance criteria; check the verification work for them is\
+  \ not folded away into a\n  generic \"testing\" epic with no traceable link.\n"
+
+# Canonical Jira component vocabulary shipped to this case as
+# .context/rhai-components.txt. Mirrored here because check judges only
+# receive outputs + annotations, and .context is provisioned input rather
+# than a collected output. Epic frontmatter 'component' must be one of these
+# (decompose-agent.md:61; submit.py validate_component strips anything else).
+valid_components:
+  - AI Core Dashboard
+  - AI Core Platform
+  - AI Core Platform Security
+  - AI Evaluations
+  - AI Guardrails
+  - AI Hub
+  - AI Navigator
+  - AI Pipelines
+  - AI Platform DevOps
+  - AI Research + Community
+  - AI Safety
+  - AI Safety Orchestration
+  - AI Testing + Workflow Validation
+  - AIPCC Ecosystems
+  - AIPCC Productization
+  - Accelerator Enablement
+  - AgentDev
+  - AgentOps
+  - Agentic
+  - AutoML
+  - AutoRAG
+  - Build and Release
+  - CI/CD
+  - Compressed-Tensors
+  - Customer Exploration & Test
+  - Data Connect Hub
+  - Data Processing
+  - DevOps
+  - Distributed Workloads
+  - Documentation
+  - Feature Store
+  - Fine Tuning
+  - Gen AI Studio
+  - IBM P
+  - IBM Z
+  - INFERENG Midstream
+  - Inference Extensions
+  - Inference Gateway
+  - Inference Research
+  - Inference-Time Techniques
+  - Infra Midstream
+  - InfraOps
+  - Integrations
+  - KubeRay
+  - Kubeflow Spark Operator
+  - Kubeflow Unified SDK
+  - LLM Compressor
+  - LlamaStack
+  - MLR Speculative Decoding
+  - MLflow
+  - Model Customization
+  - Model Runtimes
+  - Model Validation
+  - Model and Agent Observability
+  - Model as a Service
+  - Monitoring
+  - Notebooks
+  - Notebooks Extensions
+  - Notebooks Images
+  - Notebooks Server
+  - OCPMCPLO
+  - OGX Core
+  - OpenShift AI Productization
+  - Optimized Models
+  - PXE
+  - PerfScale
+  - Performance Infrastructure
+  - Performance Marketing
+  - Performance Research
+  - PyTorch
+  - QE
+  - RAG
+  - RAG + Vector DB
+  - RAG_Agentic
+  - Ray Training
+  - SDG
+  - Security
+  - Serving Orchestration
+  - Speculators
+  - TestOps
+  - Tooling Experience
+  - Training Hub
+  - Training Kubeflow
+  - UXD
+  - Wheel Building
+  - Wheel Package Index
+  - Workbenches/IDE
+  - Workload Orchestration
+  - llama.cpp
+  - llm-d
+  - vLLM
+  - vLLM Runtime
+  - watsonx Orchestrate Collaboration

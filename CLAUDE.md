@@ -93,6 +93,62 @@ When `tmp/pipeline-state.yaml` exists and the phase is not DONE:
 3. Do not wait for agent-completion notifications — the wait-for-wave command
    is unrelated to the Agent tool's notification system.
 
+## Eval Dataset Anonymization
+
+Files under `eval/cases/` and `eval/shared/` must contain no PII — the same
+policy as rfe-creator and strat-creator. Never commit real customer/partner
+names, individual names, email addresses, internal Slack / Google Docs / Miro /
+workshop links, or other personally identifiable or confidential information.
+
+The dataset has two tiers: **synthetic** (`case-001..020`, `RHAISTRAT-90xx`,
+authored from scratch) and **real** (`case-021..030`, `RHAISTRAT-80xx`, verbatim
+anonymized snapshots of signed-off production strategies). Every case declares
+its tier in `annotations.yaml`.
+
+### Real-tier pipeline
+
+Raw content never enters a committed file, and the fidelity path never passes
+through a model — the body is the verbatim Jira description with substitutions
+applied by script:
+
+```bash
+# 1. snapshot verbatim from an auto-saved Atlassian MCP result (git-ignored)
+python3 eval/scripts/extract_strategy.py <mcp-tool-result.json>
+# 2. per strategy, an LLM pass writes eval/.raw/<KEY>.tokens.yaml (semantic PII)
+#    and <KEY>.meta.yaml (case slug, arch files, grader notes)
+# 3. resolve originals -> fictional values globally in eval/.entity-map.yaml,
+#    then build the cases (re-keys tickets, redacts links, provisions .context)
+python3 eval/scripts/build_real_cases.py
+# 4. gate: emails, non-public URLs, real-range ticket keys, entity-map originals
+python3 eval/scripts/scan_real_pii.py
+```
+
+`eval/.raw/` and `eval/.entity-map.yaml` are git-ignored and hold the only copies
+of the originals. Ticket keys are re-keyed into 7000-7899; `scan_real_pii.py`
+flags any Jira-prefixed key outside 7000-9999, so high-numbered real keys cannot
+slip through. Two lessons already paid for: keep public vendor names (a cloud
+provider whose name is also a CRD kind was wrongly anonymized, contradicting the
+vendored public architecture docs), and never re-key technical identifiers that
+merely look like Jira keys (`KEM-768`, `AC-2`, `SHA-256`).
+
+The rules below govern any future case, especially ones derived from real
+strategies:
+
+- **Replacements you invent — web-search every one** (bare-name query only) to
+  catch collisions with real companies; prefer clearly invented compounds.
+  rfe-creator shipped six "fictional" names that turned out to be real
+  companies and had to redo them.
+- **Originals from real data — keep them out of search engines.** Never search
+  emails, usernames, internal links, or any name combined with context.
+  Individuals are replaced unconditionally — there is nothing to verify.
+- **Keep names consistent across files** (same real entity → same fictional
+  entity), including input.yaml, the strat-task file, and annotations.yaml.
+- **Kept as-is (not PII):** Red Hat and its products, upstream/OSS projects,
+  public vendors and hardware, generic team names, RHAISTRAT ticket keys
+  (use the synthetic 9xxx range for invented ones), public GitHub/docs URLs.
+- `eval/runs/` is git-ignored: run artifacts contain local machine paths and
+  raw model transcripts and must not be committed or shared unscrubbed.
+
 ## Architecture Context
 
 The pipeline fetches architecture context from [opendatahub-io/architecture-context](https://github.com/opendatahub-io/architecture-context) into `.context/architecture-context/` at bootstrap. A component is "in the platform" if it has an architecture context file.

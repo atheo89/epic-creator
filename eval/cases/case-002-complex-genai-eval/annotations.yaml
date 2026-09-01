@@ -1,0 +1,31 @@
+strat_id: RHAISTRAT-9002
+tier: synthetic
+notes: |
+  Deliberately large strategy: 9 HLRs across five platform components and three
+  material open questions. Expect a multi-team DAG (roughly 5-9 epics) with at
+  least one Investigation epic for the execution-engine question (open question
+  1), gating the implementation epics it shapes (gated_by + gate_failure_impact
+  populated). Docs epic (HLR-9) last. This is also the cost-scaling case for
+  the budget judge. Watch scope fidelity: the strategy does NOT choose the
+  execution engine or the result schema — epics that hardcode one have invented
+  a design decision.
+
+# Canonical Jira component vocabulary shipped to this case as
+# .context/rhai-components.txt. Mirrored here because check judges only
+# receive outputs + annotations, and .context is provisioned input rather
+# than a collected output. Epic frontmatter 'component' must be one of these
+# (decompose-agent.md:61; submit.py validate_component strips anything else).
+valid_components:
+  - Dashboard
+  - Data Science Pipelines
+  - Distributed Workloads
+  - Documentation
+  - Feature Store
+  - KServe
+  - Llama Stack
+  - Model Registry
+  - Notebooks
+  - Platform Operator
+  - Serving Runtimes
+  - Training Operator
+  - TrustyAI

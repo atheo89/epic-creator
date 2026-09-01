@@ -1,0 +1,2174 @@
+name: epic-decompose
+description: Evaluate the epic-decompose skill — decomposing RHAISTRAT strategies into validated implementation epic DAGs
+
+# The skill is collection-oriented internally (batches, waves, --batch-size), but the
+# harness's batch mode delivers cases via batch.yaml (which this skill does not read)
+# and maps outputs to cases by {n}-index prefixes (artifacts here are keyed by
+# strat_id). Case mode with one strategy per invocation is the mechanically sound
+# choice: the skill still exercises its full pipeline (a batch of one), and each case
+# gets isolated workspace provisioning for its companion files.
+execution:
+  mode: case
+  skill: epic-decompose
+  arguments: "{strat_id} --headless"
+  # Real-tier strategies are 5-20x larger than the synthetic ones (up to ~29k
+  # chars with ~300KB of .context), so both limits are sized off the largest
+  # observed synthetic case ($8.71 / 2073s on a 2.9k-char strategy) scaled 2-3x.
+  timeout: 14400           # decompose -> review -> revise -> re-review subagent waves
+  max_budget_usd: 80.0     # runaway guard; quality budget is judged at $40 (budget_check)
+  env:
+    EPIC_SKIP_BOOTSTRAP: "1"   # scripts/fetch-architecture-context.sh exits 0 without cloning
+
+runner:
+  type: claude-code
+  # epic-creator is a Claude plugin (.claude-plugin/plugin.json, skills under
+  # skills/) — without loading it via --plugin-dir, headless workspaces report
+  # "Unknown command: /epic-decompose".
+  plugin_dirs:
+    - "."
+  # Plugin dirs are ALWAYS staged into the case workspace (harness >= 1.40):
+  # the real repo path never enters session context.
+  #
+  # Locally-installed plugins are disabled in every case session by the
+  # harness's hermetic-by-default isolation.
+  # Re-enable a specific plugin with an explicit `name@marketplace: true`.
+  settings:
+    enabledPlugins:
+      "*": false
+
+models:
+  skill: claude-opus-4-6
+  judge: claude-opus-4-6
+  # no hook model: the skill is non-interactive (no AskUserQuestion)
+
+permissions:
+  # Headless --print auto-denies anything not allowed — without Write/Edit the
+  # pipeline's subagents cannot produce artifacts (reads and script execution
+  # worked, every file write was denied). Workspaces are isolated temp dirs.
+  allow:
+    - Bash
+    - Write
+    - Edit
+    - Agent
+
+# Replace the harness's project-root symlinks (scripts/, skills/, CLAUDE.md,
+# .claude/*) with real copies before each case, so pipeline writes cannot reach
+# the working tree. Modelled on strat-creator's eval/scripts/stage-case.sh.
+hooks:
+  before_each:
+    - command: bash "$AGENT_EVAL_PROJECT_ROOT/eval/scripts/stage-case.sh"
+      timeout: 120
+
+mlflow:
+  experiment: epic-decompose-eval
+
+dataset:
+  # Relative to this file's directory (config-dir), matching strat-creator's
+  # flat eval/ layout. plugin_dirs and hooks are NOT config-dir-relative:
+  # plugin_dirs resolves against the project root (cwd) and hooks use
+  # $AGENT_EVAL_PROJECT_ROOT.
+  path: cases
+  # Companion files copied from each case dir into the case workspace
+  # (dataset.workspace.files whitelist — directories copy recursively;
+  # annotations.yaml stays behind as evaluation material for judges).
+  workspace:
+    files:
+      - artifacts/strat-tasks
+      - .context
+  schema: |
+    The dataset has two tiers, declared per case in annotations.yaml `tier`:
+      - synthetic (case-001..020, strat_id RHAISTRAT-90xx): authored strategies,
+        each isolating one decomposition criterion. Small (~1-3k chars), tidy
+        HLR tables, curated expectations in annotations.notes.
+      - real (case-021..030, strat_id RHAISTRAT-80xx): verbatim anonymized
+        snapshots of production RHAISTRAT strategies that strat-creator refined
+        and a human signed off. Large (10-29k chars), heterogeneous headings,
+        no curated ground truth. Ticket references inside real bodies are
+        re-keyed into the 7000-7899 range; no real key survives anywhere.
+
+    Each case directory contains:
+    - input.yaml with fields:
+      - strat_id: strategy key matching ^RHAISTRAT-\d+$ (90xx synthetic, 80xx
+        real). No live Jira is needed — the strategy file is pre-provisioned
+        (below) and the pipeline's FETCH phase skips IDs whose strat-task file
+        already exists on disk. Not an external reference.
+      - strategy_title: the strategy's title (mirrors the frontmatter title).
+      - strategy_markdown: the FULL markdown body of the strategy (byte-identical
+        to the companion file body). Judges use this to grade HLR coverage and
+        scope fidelity — the companion file itself is not collected into outputs.
+    - artifacts/strat-tasks/RHAISTRAT-<n>.md: companion strategy file the skill reads
+      from disk. YAML frontmatter per the strat-task schema (required: strat_id
+      matching the input.yaml value, title; optional: status, priority, labels,
+      links, attachment_source — set via scripts/frontmatter.py conventions).
+      Body by tier: synthetic cases use a uniform "Problem Statement / High-Level
+      Requirements (HLR-N with P0|P1|P2) / Affected Components / Open Questions"
+      shape. Real cases vary — typically "## Business Need (from RFE)",
+      "### TL;DR", "### Technical Approach", "### High Level Requirements"
+      (bullets tagged [P0]/[P1] with NO HLR-N identifiers), "### Risks",
+      "### Open Questions", "### Prerequisites & Process Gates",
+      "## Staff Engineer / SME Input" — and 2 of the 10 carry no prioritized
+      requirement list at all, so requirements must be read out of the prose,
+      acceptance criteria, and SME input.
+    - .context/rhai-components.txt: canonical component list, one name per line.
+      Epic frontmatter 'component' values must come from this list. Synthetic
+      cases ship a 13-name curated list; real cases ship the 93-name production
+      RHAI list. Real strategy bodies name repos/codebases (odh-dashboard,
+      rhods-operator, feast-operator), so mapping prose to a canonical component
+      name is part of the task under test.
+    - .context/architecture-context/architecture/<release>/<slug>.md: architecture
+      context docs (a component is "in the platform" iff it has a file here; drives
+      Investigation identification, onboarding chains, and the architecture_claims
+      AI signal). Synthetic cases use release dir rhoai-3.0 with hand-written
+      stubs; real cases use rhoai-3.6-ea.1 with the real upstream docs. The skill
+      globs the parent directory, so the release name is not load-bearing. The
+      filename is the architecture-context repo SLUG (odh-dashboard.md,
+      rhods-operator.md, PLATFORM.md), which is NOT the same vocabulary as
+      rhai-components.txt.
+    - annotations.yaml with fields:
+      - strat_id: REQUIRED — same value as input.yaml; check judges key their
+        artifact lookups off outputs["annotations"]["strat_id"].
+      - tier: REQUIRED — 'synthetic' or 'real'. Real cases are verbatim
+        production snapshots with NO curated ground-truth decomposition, so their
+        notes are grader checklists rather than an expected answer.
+      - valid_components: REQUIRED — the canonical component vocabulary shipped
+        to this case as .context/rhai-components.txt, mirrored here because check
+        judges receive only outputs + annotations and .context is provisioned
+        input rather than a collected output. 13 names synthetic / 93 real;
+        present in all 30 cases, which is what makes component_vocabulary's
+        `if:` fire unconditionally.
+      - expected_triage: optional — 'below-threshold', 'docs-only', or absent.
+        When set, a single-epic decomposition is correct by design.
+      - sme_substantive: optional bool — true when the strategy's Staff Engineer /
+        SME Input section carries real technical content rather than template
+        placeholder text. Gates sme_input_fidelity (case-022/024/025/030).
+      - notes: optional free-text expectations (e.g. key HLRs, expected epic
+        count range) available to LLM judges via {{ annotations }}.
+
+# Bootstrap scripts call external services over raw HTTP (urllib/curl), so they
+# cannot be observed as MCP tool calls — intercept the Bash invocations instead.
+# fetch-architecture-context.sh is already neutralized via EPIC_SKIP_BOOTSTRAP=1.
+inputs:
+  tools:
+    - match: |
+        Bash commands that run scripts/fetch_components.py or scripts/fetch_strategy.py
+        (Jira REST API calls for the RHAI component list or RHAISTRAT strategy issues).
+      prompt: |
+        This eval workspace pre-provisions everything these scripts would fetch:
+        .context/rhai-components.txt and artifacts/strat-tasks/<strat_id>.md already
+        exist on disk. Deny the command and tell the agent: the file this script
+        writes is already present in the workspace — verify with ls, treat this
+        bootstrap/fetch step as SUCCESSFUL, and proceed to the next pipeline step.
+        Do not retry the script and do not stop with "bootstrap failed".
+
+outputs:
+  # artifacts/strat-tasks is deliberately NOT an output path — it holds the
+  # pre-provisioned input strategy and output dirs are cleaned between runs.
+  - path: artifacts/epic-tasks
+    schema: |
+      Per-strategy decomposition artifacts, all keyed by strat_id:
+      - {strat_id}-E00N.md — one file per epic (conditional decompositions may
+        produce {strat_id}-BRANCH-A-E00N.md). YAML frontmatter per the epic-task
+        schema: epic_id, title, parent_strat (^RHAISTRAT-\d+$), component (must be
+        a name from .context/rhai-components.txt), team, type
+        (Implementation|Investigation), priority (P0|P1|P2), dependencies (list of
+        sibling epic_ids), optional implementation_type (docs-authoring|
+        konflux-onboarding|license-validation|repo-onboarding), gated_by,
+        gate_failure_impact {action, fallback_approach}, and exactly one signal
+        block matching the type: ai_signals (9 int fields) for Implementation,
+        investigation_signals (5 int fields) for Investigation.
+        ai_implementability (High|Medium|Low) and ai_implementability_score are
+        computed by scripts/compute_ai_scores.py from the signals. Body sections:
+        Description, Scope, Acceptance Criteria, HLR Traceability; bodies must not
+        reference sibling draft IDs (e.g. "E003").
+      - {strat_id}-E00N-ai-signals.md — per-epic signal rationale table
+        (Signal | Value | Rationale).
+      - {strat_id}-decomposition.md — summary. Frontmatter: parent_strat,
+        epic_count, critical_path_length, decompose_complete: true (completion
+        sentinel), revised (revise-phase sentinel), optional triage
+        (below-threshold|docs-only) + triage_rationale. Body: Epic List table,
+        Dependency DAG (Mermaid graph TD, arrows dependency --> dependent),
+        DAG Justification table, HLR Traceability Matrix, Health Warnings,
+        Tiered Delivery.
+  - path: artifacts/epic-reviews
+    schema: |
+      {strat_id}-decomp-review.md — adversarial review. Frontmatter per the
+      decomp-review schema: strat_id, score (int 0-14, sum of 7 criteria scored
+      0-2), pass (bool; requires score >= 10 AND no criterion at 0),
+      recommendation (accept|revise), issues (list of {severity, criterion,
+      description}), error. Body: "## Review Summary" plus seven
+      "### N. <Criterion> (X/2)" sections. After the capped revise cycle, a final
+      pass: false is a legitimate outcome (reported as failed, not an error).
+  - path: artifacts/decompose-runs
+    schema: |
+      <start-timestamp>.yaml — run report from scripts/generate_run_report.py:
+      {started, completed, batch_size, total, results: [{strat_id, status
+      (missing|decomposed|error|passed|failed), epic_count, score, error}]}.
+
+traces:
+  stdout: true
+  stderr: true
+  events: true
+  metrics: true
+
+judges:
+  - name: budget_check
+    description: |
+      Cost discipline / runaway guard: a single-strategy decomposition
+      (fetch -> decompose -> review -> revise subagent waves) must complete
+      under the $40 judged cap set in arguments.max_cost_usd below. This is NOT
+      a quality signal — it gates the reward, so it sits well above realistic
+      cost. Two caps exist and they are different things: arguments.max_cost_usd
+      ($40) is the judged cap; execution.max_budget_usd ($80) is the hard
+      per-invocation stop passed to the agent CLI.
+      Largest observed cost to date: $8.71 (case-002, the biggest synthetic
+      strategy); whole 6-case run $24.86. Re-tune from measured p95 once the
+      real tier (10-29k-char strategies) has run.
+    builtin: cost_budget
+    arguments:
+      # Runaway guard, NOT a quality signal — it gates the reward, so it must sit
+      # well above realistic cost. Sized for the real tier (10-29k-char strategies);
+      # the largest synthetic case measured $8.71. Re-tune from measured p95 once
+      # the real cases have run.
+      max_cost_usd: 40.0
+
+  - name: artifact_contract
+    description: |
+      Structural gate at submit-parity. The previous version only tested
+      truthiness of seven frontmatter keys, which is far weaker than the real
+      consumer: scripts/submit.py:152 loads every epic through
+      read_frontmatter_validated(path, "epic-task") and silently drops any epic
+      that raises ValidationError (submit.py:153-155), then computes all_created
+      against the *surviving* plan (submit.py:612-616) — so the strategy is
+      labelled done and the epic is lost with no error. Reproduced on case-003's
+      artifacts: adding `estimate: 3` or `priority: High` to
+      RHAISTRAT-9003-E002.md makes `submit.py --dry-run` create 1 of 2 epics at
+      exit 0 while the old judge reported "contract satisfied (2 epics)".
+      Likewise submit.py:672-677 gates the whole strategy on _check_review_passed,
+      which validates against the decomp-review schema (artifact_utils.py:227-256)
+      requiring strat_id / score / pass AND recommendation in {accept, revise};
+      deleting the `recommendation:` line yields "SKIP: Review did not pass" ->
+      0 epics created, while the old judge still passed.
+
+      What it asserts (all citations to rules the skill/scripts already state):
+      - schema parity with artifact_utils.SCHEMAS for epic-task (:64-190),
+        decomp-summary (:191-226) and decomp-review (:227-256): required fields,
+        enums, the parent_strat / jira_key patterns, int-typed signal values,
+        investigation_signals value enums (:136-142), and unknown top-level or
+        nested keys (validate() :339-341, _validate_field :316-317);
+      - identity: epic_id equals the filename stem and is unique, parent_strat
+        equals the case's strat_id (decompose-agent.md:288-290). submit.py builds
+        id_to_jira_key from frontmatter epic_id (:301-307) and resolves every
+        dependency against that map (:381-390), so a duplicated or copy-pasted
+        epic_id silently drops a Jira Blocks link that dag_valid — which keys
+        nodes by *filename* — cannot see;
+      - sentinels: decompose_complete true (decompose-agent.md:332-336) and
+        `revised` non-null. pipeline_state.py:290-299 makes the first
+        REVIEW_DECOMP -> REVISE_DECOMP transition unconditional and clears the
+        revised default so the poller waits, and
+        check_decompose_progress.py:73-84 treats non-null `revised` as the
+        revise-phase completion sentinel — so a completed run must leave it set;
+      - triage set implies a non-empty triage_rationale and exactly one epic
+        (decompose-agent.md:20-34, review-agent.md:32);
+      - body contract per decompose-agent.md:275-281: Description / Scope /
+        Acceptance Criteria / HLR Traceability sections present (matched on
+        heading *text*, not level — case-003 uses ### where others use ##), no
+        sibling draft-ID references (decompose-agent.md:283, review-agent.md:92),
+        and no signals table in the body (decompose-agent.md:209, :281);
+      - BRANCH files, only when present (zero exist today, so this cannot
+        regress): submit.py:432-456 drops any branch file lacking `branch` or
+        `gated_by` and attaches the rest to the Jira key of the gated_by
+        *main-plan* epic (:486-492), so both must be set and resolvable.
+
+      Integration fixes applied on top of the candidate body:
+      - A1: the "epic_id == filename stem" and epic_id-uniqueness assertions are
+        restricted to MAIN-PLAN epics. decompose-agent.md:345-349 specifies
+        branch FILENAMES only and states no epic_id convention, so a branch file
+        may legitimately carry either the full stem or the plain {strat}-E###
+        form, and two branches of the same decision point may reuse an id. The
+        judge must not assert an unwritten rule.
+      - A2: body sections are matched by substring containment (not startswith),
+        and a bare `Traceability` heading satisfies `HLR Traceability` — real-tier
+        epic bodies have never been observed and heading wording varies.
+      - A3: the epic_count failure message now prints the counts actually
+        allowed rather than len(epics), which the check does not use.
+
+      Deliberately NOT here: the +1/0/-1 domain restriction on ai_signals
+      (decompose-agent.md:181) and any score arithmetic — those are semantic and
+      belong to dag_valid. This judge asserts exactly what artifact_utils.SCHEMAS
+      enforces, i.e. what submit.py will accept.
+    check: |
+      import re, yaml
+
+      def fm(t):
+          if not isinstance(t, str):
+              return {}
+          m = re.match(r'^---\s*\n(.*?\n)---\s*\n', t, re.DOTALL)
+          if not m:
+              return {}
+          try:
+              d = yaml.safe_load(m.group(1))
+          except Exception:
+              return {}
+          return d if isinstance(d, dict) else {}
+
+      def body_of(t):
+          if not isinstance(t, str):
+              return ""
+          m = re.match(r'^---\s*\n(.*?\n)---\s*\n', t, re.DOTALL)
+          return t[m.end():] if m else t
+
+      ann = outputs.get("annotations") or {}
+      strat = str(ann.get("strat_id") or "")
+      files = {p: c for p, c in (outputs.get("files") or {}).items()
+               if isinstance(c, str)}
+      if not strat:
+          return (False, "annotations.yaml missing strat_id")
+
+      EPIC_TOP = {"epic_id", "title", "parent_strat", "component", "team",
+                  "type", "implementation_type", "priority", "dependencies",
+                  "ai_signals", "investigation_signals", "ai_implementability",
+                  "ai_implementability_score", "jira_key", "branch",
+                  "gated_by", "gate_failure_impact"}
+      AI_F = ["change_specificity", "pattern_precedent", "adapter_pattern",
+              "existing_foundation", "open_questions", "external_dependency",
+              "human_process_gates", "repo_access", "architecture_claims"]
+      INV_F = {"question_specificity": [-1, 0, 1],
+               "source_accessibility": [0, 1],
+               "local_runnability": [0, 1],
+               "cluster_hardware_dependence": [-2, -1, 0],
+               "human_judgment_required": [-2, -1, 0]}
+      SUM_TOP = {"parent_strat", "epic_count", "critical_path_length",
+                 "decompose_complete", "revised", "triage", "triage_rationale"}
+      REV_TOP = {"strat_id", "score", "pass", "recommendation", "issues",
+                 "error"}
+      # A2: (reported name, accepted heading substrings)
+      SECTIONS = [("description", ("description",)),
+                  ("scope", ("scope",)),
+                  ("acceptance criteria", ("acceptance criteria",)),
+                  ("hlr traceability", ("hlr traceability", "traceability"))]
+      DRAFT_ID = re.compile(r'(?<![A-Za-z0-9])E0\d{2}\b')
+      SIG_TABLE = re.compile(r'\|\s*Signal\s*\|.*\|\s*Rationale\s*\|',
+                             re.IGNORECASE)
+
+      def isint(v):
+          return isinstance(v, int) and not isinstance(v, bool)
+
+      epat = re.compile(re.escape(strat) + r"-(?:BRANCH-([A-Z])-)?(E\d{3})\.md$")
+      main, branch = {}, {}
+      for p, c in sorted(files.items()):
+          if "epic-tasks/" not in p:
+              continue
+          m = epat.search(p)
+          if m:
+              (branch if m.group(1) else main)[p] = fm(c)
+      epics = dict(main)
+      epics.update(branch)
+
+      summary_path = next((p for p in sorted(files)
+                           if "epic-tasks/" in p
+                           and p.endswith(strat + "-decomposition.md")), None)
+      review_path = next((p for p in sorted(files)
+                          if "epic-reviews/" in p
+                          and p.endswith(strat + "-decomp-review.md")), None)
+
+      probs = []
+
+      # ---- decomposition summary -------------------------------------------
+      s = fm(files[summary_path]) if summary_path else {}
+      if summary_path is None:
+          probs.append("missing %s-decomposition.md" % strat)
+      elif not s:
+          probs.append("decomposition summary has no parseable frontmatter")
+      else:
+          for k in sorted(set(s) - SUM_TOP):
+              probs.append("summary: unknown frontmatter key '%s'" % k)
+          if s.get("parent_strat") != strat:
+              probs.append("summary: parent_strat %r != %s"
+                           % (s.get("parent_strat"), strat))
+          for k in ("epic_count", "critical_path_length"):
+              if not isint(s.get(k)):
+                  probs.append("summary: %s missing or not an int (%r)"
+                               % (k, s.get(k)))
+          if s.get("decompose_complete") is not True:
+              probs.append("summary: decompose_complete sentinel not true")
+          if s.get("revised") is None:
+              probs.append("summary: revise-phase sentinel 'revised' absent"
+                           " (REVISE_DECOMP is unconditional)")
+          elif not isinstance(s.get("revised"), bool):
+              probs.append("summary: revised not a bool (%r)" % s.get("revised"))
+          tri = s.get("triage")
+          if tri is not None and tri not in ("below-threshold", "docs-only"):
+              probs.append("summary: triage %r not in enum" % tri)
+          if tri:
+              tr = s.get("triage_rationale")
+              if not isinstance(tr, str) or not tr.strip():
+                  probs.append("summary: triage set without triage_rationale")
+              if len(epics) != 1:
+                  probs.append("summary: triage=%s but %d epic files"
+                               % (tri, len(epics)))
+          # a conditional decomposition may count main-plan epics only or all of
+          # them; both readings are permitted because the skill states neither
+          allowed_counts = sorted({len(main), len(main) + len(branch)})
+          if isint(s.get("epic_count")) and s["epic_count"] not in allowed_counts:
+              # A3: report the counts the check actually allows
+              probs.append("summary: epic_count %d not in %s (main-plan epic"
+                           " files%s)"
+                           % (s["epic_count"], allowed_counts,
+                              ", or all incl. branch" if branch else ""))
+
+      # ---- adversarial review ----------------------------------------------
+      if review_path is None:
+          probs.append("missing %s-decomp-review.md" % strat)
+      else:
+          r = fm(files[review_path])
+          if not r:
+              probs.append("review has no parseable frontmatter")
+          else:
+              for k in sorted(set(r) - REV_TOP):
+                  probs.append("review: unknown frontmatter key '%s'" % k)
+              if r.get("strat_id") != strat:
+                  probs.append("review: strat_id %r != %s"
+                               % (r.get("strat_id"), strat))
+              if not isint(r.get("score")) or not (0 <= r["score"] <= 14):
+                  probs.append("review: score missing or outside 0-14 (%r)"
+                               % r.get("score"))
+              if not isinstance(r.get("pass"), bool):
+                  probs.append("review: pass missing or not a bool")
+              if r.get("recommendation") not in ("accept", "revise"):
+                  probs.append("review: recommendation %r not in"
+                               " {accept, revise} — submit.py skips the whole"
+                               " strategy" % r.get("recommendation"))
+              if r.get("issues") is not None and \
+                      not isinstance(r.get("issues"), list):
+                  probs.append("review: issues is not a list")
+              if r.get("error"):
+                  probs.append("review: error set (%s)"
+                               % str(r.get("error"))[:80])
+
+      # ---- epic files -------------------------------------------------------
+      if not epics:
+          probs.append("no epic files produced for %s" % strat)
+      seen_ids = {}
+      for p in sorted(epics):
+          name = p.rsplit("/", 1)[-1]
+          stem = name[:-3]
+          is_branch = p in branch
+          e = epics[p]
+          if not e:
+              probs.append("%s: no parseable frontmatter" % name)
+              continue
+          for k in sorted(set(e) - EPIC_TOP):
+              probs.append("%s: unknown frontmatter key '%s'"
+                           " (submit.py drops the epic)" % (name, k))
+          for k in ("epic_id", "title", "parent_strat", "component", "team",
+                    "type", "priority"):
+              v = e.get(k)
+              if not isinstance(v, str) or not v.strip():
+                  probs.append("%s: missing/blank required '%s'" % (name, k))
+          ps = e.get("parent_strat")
+          if isinstance(ps, str) and not re.match(r"^RHAISTRAT-\d+$", ps):
+              probs.append("%s: parent_strat %r fails ^RHAISTRAT-\\d+$"
+                           % (name, ps))
+          elif isinstance(ps, str) and ps != strat:
+              probs.append("%s: parent_strat %s != %s" % (name, ps, strat))
+          eid = e.get("epic_id")
+          if isinstance(eid, str):
+              if is_branch:
+                  # A1: decompose-agent.md:345-349 fixes branch FILENAMES only
+                  # and states no epic_id convention, so accept the full stem or
+                  # the plain {strat}-E### form, and do not require uniqueness
+                  # across branches of the same decision point.
+                  bm = re.search(r'(E\d{3})$', stem)
+                  ok = stem if not bm else strat + "-" + bm.group(1)
+                  if eid != stem and eid != ok:
+                      probs.append("%s: BRANCH epic_id %r is neither the"
+                                   " filename stem %r nor %r"
+                                   % (name, eid, stem, ok))
+              else:
+                  if eid != stem:
+                      probs.append("%s: epic_id %r != filename stem %r"
+                                   % (name, eid, stem))
+                  if eid in seen_ids:
+                      probs.append("%s: duplicate epic_id %s (also %s)"
+                                   % (name, eid, seen_ids[eid]))
+                  seen_ids[eid] = name
+          for k, allowed in (("type", ("Implementation", "Investigation")),
+                             ("priority", ("P0", "P1", "P2")),
+                             ("implementation_type",
+                              ("docs-authoring", "konflux-onboarding",
+                               "license-validation", "repo-onboarding"))):
+              v = e.get(k)
+              if v is not None and v not in allowed:
+                  probs.append("%s: %s %r not in %s" % (name, k, v, list(allowed)))
+          dep = e.get("dependencies")
+          if dep is not None and not isinstance(dep, list):
+              probs.append("%s: dependencies is %s, expected list"
+                           % (name, type(dep).__name__))
+          elif isinstance(dep, list):
+              for d in dep:
+                  if not isinstance(d, str):
+                      probs.append("%s: non-string dependency %r" % (name, d))
+          jk = e.get("jira_key")
+          if jk is not None and (not isinstance(jk, str)
+                                 or not re.match(r"^[A-Z][A-Z0-9_]*-\d+$", jk)):
+              probs.append("%s: jira_key %r fails the schema pattern" % (name, jk))
+          ai = e.get("ai_signals")
+          inv = e.get("investigation_signals")
+          typ = e.get("type")
+          if typ == "Implementation" and not isinstance(ai, dict):
+              probs.append("%s: Implementation without ai_signals" % name)
+          if typ == "Investigation" and not isinstance(inv, dict):
+              probs.append("%s: Investigation without investigation_signals" % name)
+          if isinstance(ai, dict) and isinstance(inv, dict):
+              probs.append("%s: both ai_signals and investigation_signals set"
+                           % name)
+          if isinstance(ai, dict):
+              for k in sorted(set(ai) - set(AI_F)):
+                  probs.append("%s: unknown ai_signals field '%s'" % (name, k))
+              for k in AI_F:
+                  if k in ai and not isint(ai[k]):
+                      probs.append("%s: ai_signals.%s is %r, expected int"
+                                   % (name, k, ai[k]))
+          if isinstance(inv, dict):
+              for k in sorted(set(inv) - set(INV_F)):
+                  probs.append("%s: unknown investigation_signals field '%s'"
+                               % (name, k))
+              for k, allowed in INV_F.items():
+                  if k in inv:
+                      v = inv[k]
+                      if not isint(v):
+                          probs.append("%s: investigation_signals.%s is %r,"
+                                       " expected int" % (name, k, v))
+                      elif v not in allowed:
+                          probs.append("%s: investigation_signals.%s=%s not in %s"
+                                       % (name, k, v, allowed))
+          cls = e.get("ai_implementability")
+          if cls is not None and cls not in ("High", "Medium", "Low"):
+              probs.append("%s: ai_implementability %r not in enum" % (name, cls))
+          sc = e.get("ai_implementability_score")
+          if sc is not None and not isint(sc):
+              probs.append("%s: ai_implementability_score %r not an int"
+                           % (name, sc))
+          gfi = e.get("gate_failure_impact")
+          if gfi is not None:
+              if not isinstance(gfi, dict):
+                  probs.append("%s: gate_failure_impact is %s, expected dict"
+                               % (name, type(gfi).__name__))
+              else:
+                  for k in sorted(set(gfi) - {"action", "fallback_approach"}):
+                      probs.append("%s: unknown gate_failure_impact field '%s'"
+                                   % (name, k))
+                  act = gfi.get("action")
+                  if act is not None and act not in ("rewrite", "remove",
+                                                     "add_remediation"):
+                      probs.append("%s: gate_failure_impact.action %r not in enum"
+                                   % (name, act))
+                  fb = gfi.get("fallback_approach")
+                  if fb is not None and not isinstance(fb, str):
+                      probs.append("%s: gate_failure_impact.fallback_approach"
+                                   " not a string" % name)
+          # sibling signal-rationale file (decompose-agent.md:209)
+          sig_names = {q.rsplit("/", 1)[-1] for q in files
+                       if "epic-tasks/" in q}
+          if stem + "-ai-signals.md" not in sig_names:
+              probs.append("%s: missing %s-ai-signals.md rationale file"
+                           % (name, stem))
+          # body contract (decompose-agent.md:275-283)
+          b = body_of(files[p])
+          heads = []
+          for hm in re.finditer(r'^#{1,6}\s+(.+?)\s*$', b, re.M):
+              heads.append(re.sub(r'[^a-z ]', '', hm.group(1).lower()).strip())
+          for want, aliases in SECTIONS:
+              if not any(a in h for h in heads for a in aliases):
+                  probs.append("%s: body missing '%s' section" % (name, want))
+          hits = sorted(set(DRAFT_ID.findall(b)))
+          if hits:
+              probs.append("%s: body references sibling draft IDs %s"
+                           % (name, ",".join(hits[:4])))
+          if SIG_TABLE.search(b):
+              probs.append("%s: signals table written into the epic body" % name)
+
+      # ---- conditional BRANCH files (only when the path is exercised) -------
+      if branch:
+          main_ids = {v.get("epic_id") for v in main.values()
+                      if isinstance(v.get("epic_id"), str)}
+          for p in sorted(branch):
+              name = p.rsplit("/", 1)[-1]
+              e = branch[p]
+              if not isinstance(e.get("branch"), str) or not e["branch"].strip():
+                  probs.append("%s: BRANCH file without 'branch' — submit.py"
+                               " drops it" % name)
+              gb = e.get("gated_by")
+              if not isinstance(gb, str) or not gb.strip():
+                  probs.append("%s: BRANCH file without 'gated_by' — submit.py"
+                               " drops it" % name)
+              elif main_ids and gb not in main_ids:
+                  probs.append("%s: gated_by %s is not a main-plan epic_id"
+                               % (name, gb))
+
+      if not probs:
+          return (True, "contract satisfied (%d epics%s)"
+                  % (len(main),
+                     ", %d branch" % len(branch) if branch else ""))
+      msg = "; ".join(probs)
+      if len(msg) > 700:
+          keep, n = [], 0
+          for x in probs:
+              if n + len(x) > 700:
+                  break
+              keep.append(x)
+              n += len(x) + 2
+          msg = "; ".join(keep) + " (+%d more)" % (len(probs) - len(keep))
+      return (False, msg)
+
+  - name: dag_valid
+    description: |
+      Graph + signal gate. Extends the previous dag_valid (dependency targets
+      exist, no cycles, gated_by in dependencies, gate_failure_impact complete)
+      with six checks it was missing, all decidable from frontmatter alone:
+
+      1. Investigation routing. The old check only scored Implementation epics,
+         leaving every Investigation unverified. Ports classify_investigation
+         verbatim from scripts/compute_ai_scores.py:59-86 (guards, not a sum
+         threshold: spec < 0 or (src <= 0 and run <= 0) or total <= -1 -> Low;
+         total >= 2 and cluster == 0 and human == 0 -> High; else Medium) and
+         dispatches on `type` exactly as compute_for_epic does (:89-124).
+      2. Null score/class. The old check tolerated None, so a mid-loop abort in
+         compute_ai_scores.py (its non-zero exit is discarded by
+         pipeline_state.py:193-201) left every epic at ai_implementability: null
+         and still returned True. Score and class must now equal the recomputed
+         values.
+      3. Signal domains. ai_signals values must be +1/0/-1
+         (decompose-agent.md:181); investigation_signals must respect the schema
+         enums (artifact_utils.py:136-142). An out-of-domain value silently
+         shifts the sum and the High/Medium/Low routing.
+      4. Robustness. Sums only the nine SIGNAL_FIELDS compute_ai_scores.py uses
+         (:26-37) instead of every key, and coerces non-int values instead of
+         raising TypeError; fm() returns {} unless the parse yields a dict.
+      5. critical_path_length re-derived as the longest dependency chain in
+         nodes and compared with the summary value the reviewer's size heuristic
+         consumes (review-agent.md:58; written at decompose-agent.md:256).
+      6. Mermaid <-> frontmatter edge equality. decompose-agent.md:246 fixes the
+         convention (`graph TD`, arrows dependency -> dependent);
+         review-agent.md:58 makes any mismatch, and specifically an inverted
+         arrow, a critical issue (commit d05892c).
+
+      Also folded in: weak-form gate check — an epic that lists an Investigation
+      in `dependencies` must set `gated_by` to one of those Investigations
+      (decompose-agent.md:319, review-agent.md:74). The strict "gated_by covers
+      every Investigation dependency" form is unsatisfiable because `gated_by`
+      is a scalar string (artifact_utils.py:167-171).
+
+      Integration fixes applied on top of the candidate body — all four make the
+      judge correct on the conditional-decomposition path, which no run has ever
+      exercised and which the candidate would have failed outright:
+      - B1: -BRANCH- epics are exempt from the non-null score/class requirement
+        (a present value is still verified). scripts/compute_ai_scores.py:141
+        globs `{strat_id}-E*.md`, which cannot match `-BRANCH-A-E003.md`, so the
+        pipeline PHYSICALLY CANNOT score branch epics. FIXED 2026-08-20 (glob
+        widened in compute_ai_scores.py); the exemption stays until the next
+        run confirms branch epics arrive scored — then require non-null here too.
+      - B2: only ONE mermaid block is parsed — the one inside the Dependency DAG
+        section, else the first in the file. The mandated `## Tiered Delivery`
+        section (decompose-agent.md:250) may legitimately carry a second diagram
+        whose arrows are wave ordering, not dependencies; merging the two makes
+        every tier diagram an "edge absent from frontmatter" failure.
+      - B3: a diagram token that looks like an epic id but is not one is a
+        rationale NOTE, not a failure (branch node naming such as `A_E003` is
+        unspecified), and when branch files exist only main-plan edges are
+        compared.
+      - B4: BRANCH nodes are excluded from the critical_path_length
+        recomputation — conditional alternatives are not on the main-plan path.
+
+      Returns False when the case produced no epic files, preserving the
+      previous judge's contract.
+    check: |
+      import re, yaml
+
+      def fm(t):
+          if not isinstance(t, str):
+              return {}
+          m = re.match(r'^---\s*\n(.*?\n)---\s*\n', t, re.DOTALL)
+          if not m:
+              return {}
+          try:
+              d = yaml.safe_load(m.group(1))
+          except Exception:
+              return {}
+          return d if isinstance(d, dict) else {}
+
+      def ival(v):
+          return v if isinstance(v, int) and not isinstance(v, bool) else None
+
+      def short(eid):
+          m = re.search(r'((?:BRANCH-[A-Z]-)?E\d{3})$', str(eid))
+          return m.group(1) if m else str(eid)
+
+      AI_FIELDS = ["change_specificity", "pattern_precedent", "adapter_pattern",
+                   "existing_foundation", "open_questions", "external_dependency",
+                   "human_process_gates", "repo_access", "architecture_claims"]
+      INV_DOMAIN = {"question_specificity": (-1, 0, 1),
+                    "source_accessibility": (0, 1),
+                    "local_runnability": (0, 1),
+                    "cluster_hardware_dependence": (-2, -1, 0),
+                    "human_judgment_required": (-2, -1, 0)}
+
+      def classify_inv(sig):
+          s = {}
+          for f in INV_DOMAIN:
+              v = ival(sig.get(f))
+              s[f] = 0 if v is None else v
+          total = sum(s.values())
+          if (s["question_specificity"] < 0
+                  or (s["source_accessibility"] <= 0 and s["local_runnability"] <= 0)
+                  or total <= -1):
+              return total, "Low"
+          if total >= 2 and s["cluster_hardware_dependence"] == 0 and s["human_judgment_required"] == 0:
+              return total, "High"
+          return total, "Medium"
+
+      strat = str((outputs.get("annotations") or {}).get("strat_id") or "")
+      files = {p: c for p, c in (outputs.get("files") or {}).items() if isinstance(c, str)}
+      epics = {}
+      if strat:
+          for p, c in files.items():
+              m = re.search("(" + re.escape(strat) + r"-(?:BRANCH-[A-Z]-)?E\d{3})\.md$", p)
+              if m:
+                  epics[m.group(1)] = fm(c)
+      if not epics:
+          return (False, "no epic files to validate")
+
+      probs, notes = [], []
+      deps = {}
+      for eid, e in epics.items():
+          d = e.get("dependencies")
+          deps[eid] = [x for x in d if isinstance(x, str)] if isinstance(d, list) else []
+
+      # --- edges, gates ---------------------------------------------------
+      for eid in sorted(epics):
+          e = epics[eid]
+          for t in deps[eid]:
+              if t not in epics:
+                  probs.append("%s depends on nonexistent %s" % (eid, t))
+          gb = e.get("gated_by")
+          if gb and gb not in deps[eid]:
+              probs.append("%s gated_by %s not in its dependencies" % (eid, gb))
+          gfi = e.get("gate_failure_impact")
+          gfi = gfi if isinstance(gfi, dict) else {}
+          if gb and not (gfi.get("action") and gfi.get("fallback_approach")):
+              probs.append("%s gated_by without complete gate_failure_impact" % eid)
+          inv_deps = [t for t in deps[eid]
+                      if t in epics and epics[t].get("type") == "Investigation"]
+          if inv_deps and not gb:
+              probs.append("%s depends on Investigation %s but sets no gated_by"
+                           % (eid, ",".join(sorted(inv_deps))))
+          elif inv_deps and gb not in inv_deps:
+              probs.append("%s gated_by %s is not one of its Investigation dependencies %s"
+                           % (eid, gb, ",".join(sorted(inv_deps))))
+
+      # --- signals / scoring ----------------------------------------------
+      for eid in sorted(epics):
+          e = epics[eid]
+          typ = e.get("type")
+          sig = e.get("ai_signals")
+          inv = e.get("investigation_signals")
+          total = want = block = None
+          if typ == "Investigation" and isinstance(inv, dict):
+              for f in sorted(INV_DOMAIN):
+                  v = inv.get(f)
+                  if v is None:
+                      continue
+                  if ival(v) is None or ival(v) not in INV_DOMAIN[f]:
+                      probs.append("%s investigation_signals.%s=%r outside %s"
+                                   % (eid, f, v, list(INV_DOMAIN[f])))
+              total, want = classify_inv(inv)
+              block = "investigation_signals"
+          elif typ != "Investigation" and isinstance(sig, dict):
+              for f in AI_FIELDS:
+                  v = sig.get(f)
+                  if v is None:
+                      continue
+                  if ival(v) is None or ival(v) not in (-1, 0, 1):
+                      probs.append("%s ai_signals.%s=%r outside +1/0/-1" % (eid, f, v))
+              total = sum((ival(sig.get(f)) or 0) for f in AI_FIELDS)
+              want = "High" if total >= 3 else "Medium" if total >= 0 else "Low"
+              block = "ai_signals"
+          if want is None:
+              continue
+          got_s = e.get("ai_implementability_score")
+          got_c = e.get("ai_implementability")
+          if got_s is None or got_c is None:
+              # B1: compute_ai_scores.py:141 globs {strat_id}-E*.md and cannot
+              # match a BRANCH file, so an unscored branch epic is a script bug,
+              # not a decomposition defect. Whichever value IS set is still
+              # checked below.
+              if "BRANCH-" not in eid:
+                  probs.append("%s has %s but ai_implementability%s null - compute_ai_scores did not score it"
+                               % (eid, block, "_score" if got_s is None else ""))
+              else:
+                  notes.append("%s (branch) unscored - compute_ai_scores.py glob cannot reach it"
+                               % eid)
+          if got_s is not None and ival(got_s) != total:
+              probs.append("%s ai_implementability_score %r != %d recomputed from %s"
+                           % (eid, got_s, total, block))
+          if got_c is not None and got_c != want:
+              probs.append("%s ai_implementability %r != %s recomputed from %s"
+                           % (eid, got_c, want, block))
+
+      # --- cycles -----------------------------------------------------------
+      indeg = {e: len(set(t for t in deps[e] if t in epics)) for e in epics}
+      queue = [e for e in epics if indeg[e] == 0]
+      seen = 0
+      while queue:
+          n = queue.pop()
+          seen += 1
+          for e in epics:
+              if n in deps[e]:
+                  indeg[e] -= 1
+                  if indeg[e] == 0:
+                      queue.append(e)
+      acyclic = seen == len(epics)
+      if not acyclic:
+          probs.append("dependency cycle detected")
+
+      # --- summary: critical path + Mermaid ---------------------------------
+      summary = next((c for p, c in files.items()
+                      if p.endswith(strat + "-decomposition.md")), None)
+      s = fm(summary) if summary is not None else {}
+      short_ids = set(short(e) for e in epics)
+      has_branch = any("BRANCH-" in e for e in epics)
+      main_short = set(short(e) for e in epics if "BRANCH-" not in e)
+      fm_edges = set()
+      for eid in epics:
+          for t in deps[eid]:
+              if t in epics:
+                  fm_edges.add((short(t), short(eid)))
+
+      if acyclic and isinstance(s.get("critical_path_length"), int) and not isinstance(s.get("critical_path_length"), bool):
+          # critical_path_length has NO stated definition upstream
+          # (decompose-agent.md:256 gap, reported to skill owners), and the
+          # 2026-08-19 run showed the pipeline counts BRANCH chains while the
+          # original B4 fix excluded them — failing a correct conditional
+          # decomposition (case-007: pipeline 4, main-plan-only 1). Accept a
+          # summary value matching EITHER convention; only flag when it
+          # matches neither.
+          def longest_chain(nodes):
+              memo = {}
+              def depth(e):
+                  if e in memo:
+                      return memo[e]
+                  memo[e] = 1
+                  best = 1
+                  for t in deps[e]:
+                      if t in nodes:
+                          best = max(best, 1 + depth(t))
+                  memo[e] = best
+                  return best
+              return max(depth(e) for e in nodes) if nodes else 0
+
+          main_nodes = set(e for e in epics if "BRANCH-" not in e) or set(epics)
+          candidates = {longest_chain(main_nodes), longest_chain(set(epics))}
+          if s["critical_path_length"] not in candidates:
+              probs.append("critical_path_length %s matches neither convention (main-plan chain %s)"
+                           % (s["critical_path_length"], sorted(candidates)))
+
+      if summary is not None:
+          # B2: parse ONE diagram — the Dependency DAG one. The mandated Tiered
+          # Delivery section may carry a second mermaid block whose arrows are
+          # wave ordering, not dependencies.
+          sec = re.search(r'^#{1,6}[ \t]*[^\n]*dependency dag[^\n]*$(.*?)(?=^#{1,6}[ \t]|\Z)',
+                          summary, re.M | re.S | re.I)
+          blocks = re.findall(r'```mermaid(.*?)```', sec.group(1), re.S)[:1] if sec else []
+          if not blocks:
+              blocks = re.findall(r'```mermaid(.*?)```', summary, re.S)[:1]
+          if not blocks:
+              if len(epics) > 1 and not s.get("triage"):
+                  probs.append("decomposition summary has no mermaid DAG diagram (%d epics)" % len(epics))
+          else:
+              dia, unknown = set(), set()
+              for blk in blocks:
+                  for line in blk.splitlines():
+                      line = line.strip()
+                      if not line or line.startswith(("graph", "flowchart", "subgraph", "end",
+                                                      "classDef", "class ", "style", "linkStyle", "%%")):
+                          continue
+                      parts = re.split(r'\s*[-=.]{2,}>\s*(?:\|[^|]*\|\s*)?', line)
+                      if len(parts) < 2:
+                          continue
+                      groups = []
+                      for part in parts:
+                          ids = []
+                          for tok in part.split("&"):
+                              tok = re.sub(r'[\[\(\{].*$', '', tok).strip().strip('"')
+                              if tok:
+                                  ids.append(short(tok))
+                          groups.append(ids)
+                      for lhs, rhs in zip(groups, groups[1:]):
+                          for a in lhs:
+                              for b2 in rhs:
+                                  if a in short_ids and b2 in short_ids:
+                                      dia.add((a, b2))
+                                  else:
+                                      for t in (a, b2):
+                                          if re.match(r'^(?:BRANCH-[A-Z]-)?E\d{3}$', t) and t not in short_ids:
+                                              unknown.add(t)
+              # B3: unrecognized diagram tokens are a note, not a gate failure
+              for t in sorted(unknown):
+                  notes.append("DAG diagram references unknown node %s" % t)
+              cmp_edges = fm_edges
+              if has_branch:
+                  # B3: with branch files present, compare main-plan edges only
+                  dia = set((a, b2) for a, b2 in dia
+                            if a in main_short and b2 in main_short)
+                  cmp_edges = set((a, b2) for a, b2 in fm_edges
+                                  if a in main_short and b2 in main_short)
+              if dia:
+                  if cmp_edges and dia == set((b2, a) for a, b2 in cmp_edges):
+                      probs.append("DAG diagram arrows inverted (dependent -> dependency); "
+                                   "convention is dependency -> dependent")
+                  else:
+                      miss = sorted("%s->%s" % e for e in (cmp_edges - dia))
+                      extra = sorted("%s->%s" % e for e in (dia - cmp_edges))
+                      if miss:
+                          probs.append("frontmatter dependencies absent from DAG diagram: %s"
+                                       % ", ".join(miss[:6]))
+                      if extra:
+                          probs.append("DAG diagram edges absent from frontmatter: %s"
+                                       % ", ".join(extra[:6]))
+              elif cmp_edges:
+                  probs.append("DAG diagram has no parseable edges but frontmatter declares %d"
+                               % len(cmp_edges))
+
+      tail = (" [notes: %s]" % "; ".join(notes)) if notes else ""
+      if probs:
+          return (False, "; ".join(probs) + tail)
+      return (True, "DAG + signals valid (%d epics)%s" % (len(epics), tail))
+
+  - name: implementation_type_rules
+    description: |
+      Enforces the ORDERING rules that key off `implementation_type`, all
+      mechanically decidable from epic frontmatter alone, and all missed by the
+      pipeline's own reviewer on case-006 (14/14, DAG Coherence 2/2) — this is
+      independent double-checking where reviewer leniency was actually observed,
+      not a re-implementation of the reviewer.
+
+      Rules enforced (decompose-agent.md:117-123, restated as Rule 20 at :138):
+        - Rule 7  license-validation || repo-onboarding — no edge either way
+        - Rule 8  license-validation || konflux-onboarding — no edge either way
+        - Rule 10 konflux-onboarding || general implementation — no edge either
+                  way. case-006 RHAISTRAT-9006-E005 (general) depends on
+                  RHAISTRAT-9006-E004 (konflux-onboarding); the review file
+                  justified it with a nonexistent "Rule 7
+                  (konflux-onboarding -> general implementation)".
+        - Rule 11 docs-authoring blocked by ALL Implementation epics (always
+                  last). Peer docs-authoring epics and BRANCH (conditional)
+                  epics are excluded from the universe.
+      Parallel rules are checked on direct edges only, so one illegal edge is
+      reported once rather than cascading to every transitive dependent. Edges
+      into a docs-authoring epic are exempt from the parallel rules — Rule 11
+      requires them.
+
+      B5 — Rules 5, 6 and 9 (the "serial, same component" chains:
+      repo-onboarding -> konflux-onboarding, repo-onboarding -> general,
+      license-validation -> general) are DELIBERATELY NOT ENFORCED. Their own
+      scope keys off REPO identity ("general implementation of the onboarded
+      component", ":118 Doesn't block other repos") and epic frontmatter carries
+      no repo field. The only available proxy, `component`, is a Jira component
+      from a 93-name production list whose entries span several repos each, so
+      the rule is mechanically undecidable from the artifacts: scoping it by
+      component false-positives on any strategy that onboards one new repo while
+      touching an existing component (reproduced: one repo-onboarding epic plus
+      two unrelated general epics under `Distributed Workloads` -> two bogus
+      Rule 6 reports), and dropping the scoping is strictly worse. Reported to
+      skill owners as a frontmatter gap. Everything the observed run actually
+      caught (case-006, Rule 10) survives.
+
+      B6 — the mandated-AC rules 24 and 25 moved to their own judge,
+      mandated_acceptance_criteria: they grade acceptance-criteria TEXT rather
+      than graph shape, they need the widened phrase families, and they are
+      staged thresholdless for a calibration run while these ordering rules gate
+      at min_pass_rate 1.0.
+
+      Vacuously true when a case produced no epic files: "did the pipeline
+      produce artifacts at all" is artifact_contract's gate, and double-counting
+      it would multiply the same failure through the suite twice.
+    check: |
+      import re, yaml
+
+      def fm(t):
+          if not isinstance(t, str):
+              return {}
+          m = re.match(r'^---\s*\n(.*?\n)---\s*\n', t, re.DOTALL)
+          if not m:
+              return {}
+          try:
+              d = yaml.safe_load(m.group(1))
+          except Exception:
+              return {}
+          return d if isinstance(d, dict) else {}
+
+      strat = str((outputs.get("annotations") or {}).get("strat_id") or "")
+      files = {p: c for p, c in (outputs.get("files") or {}).items() if isinstance(c, str)}
+      front = {}
+      if strat:
+          for p, c in files.items():
+              m = re.search("(" + re.escape(strat) + r"-(?:BRANCH-[A-Z]-)?E\d{3})\.md$", p)
+              if m:
+                  front[m.group(1)] = fm(c)
+      if not front:
+          return (True, "no epic files - no implementation_type rules apply")
+
+      IT_ENUM = ("docs-authoring", "konflux-onboarding", "license-validation", "repo-onboarding")
+      typ, itype, deps = {}, {}, {}
+      for eid, data in front.items():
+          typ[eid] = data.get("type")
+          v = data.get("implementation_type")
+          itype[eid] = v if v in IT_ENUM else None
+          dl = data.get("dependencies")
+          deps[eid] = [x for x in dl if isinstance(x, str) and x in front] if isinstance(dl, list) else []
+
+      def kind(eid):
+          if typ.get(eid) != "Implementation":
+              return "non-implementation"
+          return itype.get(eid) or "general"
+
+      def closure(eid):
+          seen, stack = set(), list(deps.get(eid, []))
+          while stack:
+              n = stack.pop()
+              if n in seen:
+                  continue
+              seen.add(n)
+              stack.extend(deps.get(n, []))
+          return seen
+
+      probs = []
+      docs = sorted(e for e in front if itype.get(e) == "docs-authoring")
+
+      # --- parallel rules 7 / 8 / 10: prohibited direct edges ----------------
+      PAR = {frozenset(("license-validation", "repo-onboarding")): "Rule 7",
+             frozenset(("license-validation", "konflux-onboarding")): "Rule 8",
+             frozenset(("konflux-onboarding", "general")): "Rule 10"}
+      for eid in sorted(front):
+          if kind(eid) == "docs-authoring":
+              continue
+          for t in deps[eid]:
+              key = frozenset((kind(t), kind(eid)))
+              if len(key) == 2 and key in PAR:
+                  probs.append("%s: %s (%s) blocks %s (%s) - these must run in parallel"
+                               % (PAR[key], t, kind(t), eid, kind(eid)))
+
+      # --- rule 11: docs-authoring last --------------------------------------
+      universe = [e for e in front
+                  if typ.get(e) == "Implementation"
+                  and itype.get(e) != "docs-authoring"
+                  and "BRANCH-" not in e]
+      for d in docs:
+          cl = closure(d)
+          missing = sorted(e for e in universe if e != d and e not in cl)
+          if missing:
+              probs.append("Rule 11: docs-authoring %s is not blocked by every Implementation epic - missing %s"
+                           % (d, ", ".join(missing[:6])))
+
+      return (not probs,
+              "; ".join(probs) or "implementation_type ordering rules satisfied (%d epics)" % len(front))
+
+  - name: mandated_acceptance_criteria
+    description: |
+      B6 — split out of implementation_type_rules. Enforces the two rules that
+      mandate specific acceptance criteria (decompose-agent.md:144-145;
+      review-agent.md:92 "applies to every epic that meets the rule's criteria,
+      not just the first or most obvious one"):
+        - Rule 24 a docs-authoring epic must carry a "technically reviewed
+                  against the implementation" AC;
+        - Rule 25 an Implementation epic with konflux-onboarding in its
+                  transitive dependency chain must carry a "build pipeline
+                  green" AC. docs-authoring epics are excluded from the Rule 25
+                  candidate set (Rule 24 already governs them; the literal rule
+                  text is broader than intent — flagged to skill owners).
+      Matching searches the Acceptance Criteria section, falling back to the
+      whole body when no such heading exists, so heading-level and wording
+      variation on the real tier cannot false-positive.
+
+      B7 — the phrase families are widened against real observed AC wording,
+      which the narrow candidate regexes missed:
+        - Rule 25 also matches `konflux` within ~40 chars of ci/job/build/
+          pipeline ("The Konflux CI job succeeds on merge to main") and
+          `pipeline` within ~40 chars of green/passes/succeeds;
+        - Rule 24 also matches `review` within ~60 chars of implementation/
+          accuracy/technical ("Reviewed by a subject-matter expert against the
+          shipped implementation", "Engineering review confirms accuracy against
+          the implementation").
+      A false Rule-24/25 report is worse than a miss here: the AC is a wording
+      convention, not a structural fact.
+
+      B8 — a Rule-25 report is SUPPRESSED (recorded as a note) when the epic's
+      only path to a konflux-onboarding epic runs through an edge that is itself
+      a Rule-10 violation. Rule 10 forbids konflux -> general edges, so in a
+      rule-compliant DAG no general Implementation can have konflux in its
+      chain at all; without the suppression a single illegal edge is billed
+      three times (once by implementation_type_rules, then once per transitive
+      dependent here). Rule 25 as written at decompose-agent.md:145 is arguably
+      vacuous for that reason — reported to skill owners; B9 stages this judge
+      thresholdless rather than rewriting the rule.
+
+      B9 — NO threshold for one calibration run. It has never been validated
+      against a real-tier AC corpus and must not fail CI until it has been.
+
+      Vacuously true when a case produced no epic files (artifact_contract owns
+      that failure).
+    check: |
+      import re, yaml
+
+      def fm(t):
+          if not isinstance(t, str):
+              return {}
+          m = re.match(r'^---\s*\n(.*?\n)---\s*\n', t, re.DOTALL)
+          if not m:
+              return {}
+          try:
+              d = yaml.safe_load(m.group(1))
+          except Exception:
+              return {}
+          return d if isinstance(d, dict) else {}
+
+      strat = str((outputs.get("annotations") or {}).get("strat_id") or "")
+      files = {p: c for p, c in (outputs.get("files") or {}).items() if isinstance(c, str)}
+      front, body = {}, {}
+      if strat:
+          for p, c in files.items():
+              m = re.search("(" + re.escape(strat) + r"-(?:BRANCH-[A-Z]-)?E\d{3})\.md$", p)
+              if not m:
+                  continue
+              front[m.group(1)] = fm(c)
+              body[m.group(1)] = re.sub(r'^---\s*\n.*?\n---\s*\n', '', c, count=1, flags=re.DOTALL)
+      if not front:
+          return (True, "no epic files - no mandated-AC rules apply")
+
+      IT_ENUM = ("docs-authoring", "konflux-onboarding", "license-validation", "repo-onboarding")
+      typ, itype, deps = {}, {}, {}
+      for eid, data in front.items():
+          typ[eid] = data.get("type")
+          v = data.get("implementation_type")
+          itype[eid] = v if v in IT_ENUM else None
+          dl = data.get("dependencies")
+          deps[eid] = [x for x in dl if isinstance(x, str) and x in front] if isinstance(dl, list) else []
+
+      def kind(eid):
+          if typ.get(eid) != "Implementation":
+              return "non-implementation"
+          return itype.get(eid) or "general"
+
+      # B8: the Rule-10 illegal direct edges, as (dependency, dependent)
+      illegal = set()
+      for eid in front:
+          if kind(eid) == "docs-authoring":
+              continue
+          for t in deps[eid]:
+              if frozenset((kind(t), kind(eid))) == frozenset(("konflux-onboarding", "general")):
+                  illegal.add((t, eid))
+
+      def reachable(start, banned=frozenset()):
+          seen, stack = set(), [(t, start) for t in deps.get(start, [])]
+          while stack:
+              dep, node = stack.pop()
+              if (dep, node) in banned or dep in seen:
+                  continue
+              seen.add(dep)
+              stack.extend((t, dep) for t in deps.get(dep, []))
+          return seen
+
+      def ac_text(eid):
+          b = body.get(eid, "")
+          m = re.search(r'^[ \t]{0,3}#{1,6}[ \t]*[^\n]*acceptance criteria[^\n]*$(.*?)(?=^[ \t]{0,3}#{1,6}[ \t]|\Z)',
+                        b, re.M | re.S | re.I)
+          return m.group(1) if m else b
+
+      # B7: widened phrase families
+      R24 = re.compile(r'technical(?:ly)?[^\n]{0,60}review'
+                       r'|review[^\n]{0,60}technical'
+                       r'|review(?:ed|er|ers|s|ing)?[^\n]{0,60}(?:implementation|accuracy)'
+                       r'|(?:implementation|accuracy)[^\n]{0,60}review', re.I)
+      R25 = re.compile(r'build[\s-]?pipeline'
+                       r'|pipeline[^\n]{0,40}(?:green|pass(?:es|ing|ed)?|succeed(?:s|ing|ed)?|successful)'
+                       r'|(?:green|pass(?:es|ing|ed)?|succeed(?:s|ing|ed)?|successful)[^\n]{0,40}pipeline'
+                       r'|konflux[^\n]{0,40}(?:ci\b|job|build|pipeline)'
+                       r'|(?:ci\b|job|build|pipeline)[^\n]{0,40}konflux', re.I)
+
+      probs, notes = [], []
+      docs = sorted(e for e in front if itype.get(e) == "docs-authoring")
+
+      for d in docs:
+          if not R24.search(ac_text(d)):
+              probs.append("Rule 24: docs-authoring %s has no 'technically reviewed against implementation' AC" % d)
+
+      for eid in sorted(front):
+          if typ.get(eid) != "Implementation" or itype.get(eid) == "docs-authoring":
+              continue
+          if not any(itype.get(t) == "konflux-onboarding" for t in reachable(eid)):
+              continue
+          if illegal and not any(itype.get(t) == "konflux-onboarding"
+                                 for t in reachable(eid, illegal)):
+              # B8: the only konflux path runs through a Rule-10 violation, which
+              # implementation_type_rules already reports. Do not bill it twice.
+              notes.append("Rule 25 not evaluated for %s - its only konflux path runs"
+                           " through a Rule-10 illegal edge" % eid)
+              continue
+          if not R25.search(ac_text(eid)):
+              probs.append("Rule 25: %s has konflux-onboarding in its dependency chain but no 'build pipeline green' AC"
+                           % eid)
+
+      tail = (" [notes: %s]" % "; ".join(notes)) if notes else ""
+      if probs:
+          return (False, "; ".join(probs) + tail)
+      return (True, "mandated acceptance criteria present (%d epics)%s" % (len(front), tail))
+
+  - name: triage_expectation
+    if: "annotations.get('expected_triage')"
+    description: |
+      Turns the dataset's curated triage ground truth into a gate. Step 0 of
+      decompose-agent.md:11-34 is the first, flow-terminating check: a
+      below-threshold or docs-only strategy must produce exactly one epic file
+      plus a summary carrying triage=<value> and triage_rationale, and docs-only
+      additionally requires implementation_type: docs-authoring on that epic
+      (decompose-agent.md:22). Both review-agent.md:32 and the old
+      artifact_contract encode only the forward direction ("triage set implies
+      one epic"); the failure this catches is the reverse.
+
+      Scope: `if:` on the expected_triage annotation. After dataset change A9
+      only case-004 (docs-only) and case-009 (single component, P2-only) carry
+      the field, and both are synthetic, so the judge is inert on the real tier
+      by construction — it makes no assumption about strategy structure at all.
+      The converse ("triage set but annotations do not expect it") is
+      deliberately NOT asserted: real-tier annotations are grader checklists,
+      not ground truth, so absence cannot mean triage is wrong.
+
+      A9 (landed with this change): case-003's expected_triage was removed. Its
+      strategy names TWO Affected Components (Notebooks, Dashboard), so
+      decompose-agent.md:15's "a single component AND a single team"
+      precondition for below-threshold is not met, and its HLR-2 (release note
+      plus cluster-settings documentation) hits the :19 "code implementation +
+      content authoring + documentation" escape — a 2-epic output there is
+      prompt-permitted, so gating on it would have been a misconfigured gate.
+      Honest caveat: case-009's HLR-2 is doc caption updates, so it too is
+      weakly contestable under :19 until skill owners qualify that clause.
+    check: |
+      import re, yaml
+
+      def fm(t):
+          if not isinstance(t, str):
+              return {}
+          m = re.match(r'^---\s*\n(.*?\n)---\s*\n', t, re.DOTALL)
+          if not m:
+              return {}
+          try:
+              d = yaml.safe_load(m.group(1))
+          except Exception:
+              return {}
+          return d if isinstance(d, dict) else {}
+
+      ann = outputs.get("annotations") or {}
+      want = ann.get("expected_triage")
+      if not want:
+          return (True, "no expected_triage in annotations — check not applicable")
+      strat = str(ann.get("strat_id") or "")
+      files = {p: c for p, c in (outputs.get("files") or {}).items()
+               if isinstance(c, str)}
+      if not strat:
+          return (False, "annotations.yaml missing strat_id")
+
+      epat = re.compile(re.escape(strat) + r"-(?:BRANCH-[A-Z]-)?E\d{3}\.md$")
+      epics = {p: fm(c) for p, c in sorted(files.items())
+               if "epic-tasks/" in p and epat.search(p)}
+      summary = next((c for p, c in sorted(files.items())
+                      if "epic-tasks/" in p
+                      and p.endswith(strat + "-decomposition.md")), None)
+      if summary is None:
+          return (False, "expected triage=%s but no decomposition summary exists"
+                  % want)
+      s = fm(summary)
+      got = s.get("triage")
+      probs = []
+      if got != want:
+          probs.append("summary triage=%r, annotations expect %r" % (got, want))
+      if len(epics) != 1:
+          probs.append("%d epic files, triaged strategies produce exactly 1"
+                       % len(epics))
+      tr = s.get("triage_rationale")
+      if not isinstance(tr, str) or not tr.strip():
+          probs.append("triage_rationale missing or empty")
+      if want == "docs-only":
+          bad = [p.rsplit("/", 1)[-1] for p, e in epics.items()
+                 if e.get("implementation_type") != "docs-authoring"]
+          if bad:
+              probs.append("docs-only epic(s) without"
+                           " implementation_type: docs-authoring: %s"
+                           % ",".join(sorted(bad)))
+      if probs:
+          return (False, "expected_triage=%s: %s" % (want, "; ".join(probs)))
+      return (True, "triage=%s honored with 1 epic and a rationale" % want)
+
+  - name: run_report_consistent
+    description: |
+      artifacts/decompose-runs/<start-timestamp>.yaml is a declared output with a
+      declared schema (the third outputs path above), REPORT is the terminal
+      state-machine phase (pipeline_state.py PHASES, and BATCH_DONE -> REPORT),
+      and generate_run_report.py:36-57 derives each result row from the same
+      artifacts the other judges read. No judge read it before.
+
+      case-002 has no artifacts/decompose-runs/ directory at all. Confirmed from
+      the transcript, not inferred: the dispatcher's last four Bash calls were
+      `pipeline_state.py next-action`, `pipeline_state.py run-phase`,
+      `pipeline_state.py next-action`, then `pipeline_state.py set-phase DONE` —
+      it jumped straight to DONE and never ran the REPORT script. Both existing
+      check judges passed and decomposition_quality scored 4/5, so the missing
+      declared output was invisible.
+
+      Checks: a report exists; it carries the declared top-level keys; it has a
+      results row for the case's strat_id; that row's status is in the declared
+      enum; score equals the review's score; and status agrees with the review
+      (passed <=> pass: true, failed <=> pass: false, error <=> review error
+      set). A run that legitimately fails its final review is a documented valid
+      outcome, so `failed` is accepted — only *disagreement* with the artifacts
+      is a failure. When more than one report is present the newest is evaluated
+      and the count is reported (a second report means the pipeline was
+      re-initialized mid-run, which is pipeline_protocol's business).
+
+      A4 — the report's epic_count is compared against the DECOMPOSITION
+      SUMMARY's epic_count, not against epic files on disk.
+      generate_run_report.py:43 copies the value verbatim out of the summary
+      frontmatter, so a disk comparison here would make this judge contradict
+      artifact_contract on any conditional decomposition (fixture: summary
+      epic_count 2 with 4 files on disk -> artifact_contract True,
+      run_report_consistent False). Summary-vs-disk is artifact_contract's job
+      and is asserted exactly once.
+      A5 — NO threshold this run: case-002's missing decompose-runs/ is still
+      ambiguous between a pipeline gap and an artifact-collection gap
+      (case-002/006 workspaces were reconciled post-run). Add
+      min_pass_rate: 1.0 once one clean run settles it.
+    check: |
+      import re, yaml
+
+      def fm(t):
+          if not isinstance(t, str):
+              return {}
+          m = re.match(r'^---\s*\n(.*?\n)---\s*\n', t, re.DOTALL)
+          if not m:
+              return {}
+          try:
+              d = yaml.safe_load(m.group(1))
+          except Exception:
+              return {}
+          return d if isinstance(d, dict) else {}
+
+      ann = outputs.get("annotations") or {}
+      strat = str(ann.get("strat_id") or "")
+      files = {p: c for p, c in (outputs.get("files") or {}).items()
+               if isinstance(c, str)}
+      if not strat:
+          return (False, "annotations.yaml missing strat_id")
+
+      reports = sorted(p for p in files
+                       if "decompose-runs/" in p
+                       and p.rsplit(".", 1)[-1] in ("yaml", "yml"))
+      if not reports:
+          return (False, "no artifacts/decompose-runs/<timestamp>.yaml — the"
+                         " REPORT phase never ran (declared output missing)")
+      path = reports[-1]
+      try:
+          rep = yaml.safe_load(files[path])
+      except Exception as exc:
+          return (False, "%s is not parseable YAML: %s"
+                  % (path, type(exc).__name__))
+      if not isinstance(rep, dict):
+          return (False, "%s does not contain a mapping" % path)
+
+      probs = []
+      for k in ("started", "completed", "batch_size", "total", "results"):
+          if k not in rep:
+              probs.append("report missing declared key '%s'" % k)
+      rows = rep.get("results")
+      if not isinstance(rows, list):
+          probs.append("report 'results' is not a list")
+          rows = []
+      if isinstance(rep.get("total"), int) and rep["total"] != len(rows):
+          probs.append("report total=%s but %d result rows"
+                       % (rep["total"], len(rows)))
+      row = next((r for r in rows
+                  if isinstance(r, dict) and r.get("strat_id") == strat), None)
+      if row is None:
+          probs.append("report has no results row for %s" % strat)
+      else:
+          # A4: generate_run_report.py:43 copies epic_count out of the summary
+          # frontmatter, so the report is consistent iff it matches the SUMMARY.
+          # Summary-vs-disk belongs to artifact_contract and is asserted there.
+          summary = next((c for p, c in sorted(files.items())
+                          if "epic-tasks/" in p
+                          and p.endswith(strat + "-decomposition.md")), None)
+          s = fm(summary) if summary is not None else {}
+          review = next((c for p, c in sorted(files.items())
+                         if "epic-reviews/" in p
+                         and p.endswith(strat + "-decomp-review.md")), None)
+          r = fm(review) if review is not None else {}
+          status = row.get("status")
+          if status not in ("missing", "decomposed", "error", "passed",
+                            "failed"):
+              probs.append("report status %r not in the declared enum" % status)
+          if summary is None:
+              if status in ("decomposed", "passed", "failed"):
+                  probs.append("report status=%s but no decomposition summary"
+                               " exists" % status)
+          elif "epic_count" in row and row.get("epic_count") != s.get("epic_count"):
+              probs.append("report epic_count=%s but the decomposition summary"
+                           " declares %s"
+                           % (row.get("epic_count"), s.get("epic_count")))
+          if review is None:
+              if status in ("passed", "failed"):
+                  probs.append("report status=%s but no review file exists"
+                               % status)
+          else:
+              if "score" in row and row.get("score") != r.get("score"):
+                  probs.append("report score=%s but review score=%s"
+                               % (row.get("score"), r.get("score")))
+              if r.get("error"):
+                  want = "error"
+              elif r.get("pass") is True:
+                  want = "passed"
+              else:
+                  want = "failed"
+              if status != want:
+                  probs.append("report status=%s but review implies %s"
+                               % (status, want))
+      note = "" if len(reports) == 1 else \
+          " [%d reports present, newest evaluated]" % len(reports)
+      if probs:
+          return (False, "; ".join(probs) + note)
+      return (True, "run report consistent with artifacts (%s)%s"
+              % (path.rsplit("/", 1)[-1], note))
+
+  - name: review_discipline
+    description: |
+      Replaces the retired self_review_score. That judge graded the system under
+      test with its own self-report: observed values 0.0 / 0.929 / 1.0 / 1.0 /
+      1.0 / 1.0, almost no variance, and its only real discriminative power ("a
+      review file with an integer score exists") is already asserted by
+      artifact_contract. Worse, it was anti-aligned — it returned 1.00 on
+      case-003, the exact case where the reviewer missed the triage trigger and
+      scored 14/14 with zero issues, so making the reviewer more honest would
+      *lower* a thresholded metric while true quality rises. It also conflated
+      "no review file" with "reviewer scored 0/14".
+
+      This judge instead re-derives the reviewer's own arithmetic and its own
+      stated decision rule from review-agent.md:102-153 — it does NOT re-grade
+      the decomposition (that is decomposition_quality's job, and the two
+      observed leniency events, case-003's triage miss at 14/14 and case-006's
+      ordering miss at DAG Coherence 2/2, are covered by triage_expectation and
+      implementation_type_rules respectively):
+        - exactly seven "### N. <Criterion> (X/2)" sections, each 0-2
+          (review-agent.md:118-146);
+        - frontmatter `score` equals their sum (review-agent.md:104);
+        - any critical or major issue in the `issues` list forces that
+          criterion to 0 (review-agent.md:104);
+        - pass <=> (score >= 10 AND no criterion at 0) (review-agent.md:106-110);
+        - recommendation accept <=> pass (review-agent.md:109-110).
+      It matters because a single inflated `pass` deletes the pipeline's whole
+      self-correction path: REVISE_CHECK reads only data.get("pass", True).
+
+      Integration fixes applied on top of the candidate body:
+      - A6: the section regex is loosened — optional `Criterion` prefix,
+        optional emphasis markers, `—`/`:`/`-` as separator, optional trailing
+        punctuation. The candidate's strict form returned a hard False on
+        `### 1. HLR Coverage **(2/2)**`, `— 2/2`, `### Criterion 1: …` and a
+        trailing `:`, none of which the skill forbids.
+      - A7: when seven sections still cannot be located but the frontmatter is
+        well-formed and self-consistent, the judge PASSES with a note. A
+        body-format assertion belongs to artifact_contract; this judge's subject
+        is the reviewer's arithmetic.
+      - A8: a missing review file is a vacuous pass with a note.
+        artifact_contract already fails that case, and this judge's own
+        no-double-billing principle applies to it too. A8 is also what makes
+        min_pass_rate: 1.0 safe — 6/6 on the observed run instead of 5/6.
+
+      Edges: skipped with a pass when the review carries `error`
+      (review-agent.md:20-26 writes score=0/pass=false with no body sections).
+    check: |
+      import re, yaml
+
+      ann = outputs.get("annotations") or {}
+      strat = str(ann.get("strat_id") or "")
+      files = {p: c for p, c in (outputs.get("files") or {}).items()
+               if isinstance(c, str)}
+      if not strat:
+          return (False, "annotations.yaml missing strat_id")
+      path = next((p for p in sorted(files)
+                   if "epic-reviews/" in p
+                   and p.endswith(strat + "-decomp-review.md")), None)
+      if path is None:
+          # A8: artifact_contract already fails a missing review file; billing it
+          # again here would multiply one defect across the suite.
+          return (True, "no %s-decomp-review.md — reviewer discipline not"
+                        " applicable [NOTE: artifact_contract owns that failure]"
+                  % strat)
+      text = files[path]
+      m = re.match(r'^---\s*\n(.*?\n)---\s*\n', text, re.DOTALL)
+      try:
+          front = yaml.safe_load(m.group(1)) if m else {}
+      except Exception:
+          front = {}
+      if not isinstance(front, dict):
+          front = {}
+      body = text[m.end():] if m else text
+      if front.get("error"):
+          return (True, "review reports error (%s) — scoring sections not"
+                        " expected" % str(front.get("error"))[:60])
+
+      # A6: tolerate emphasis markers, a 'Criterion' prefix, en/em-dash or colon
+      # separators and trailing punctuation around the mandated section headings.
+      secs = []
+      for line in body.splitlines():
+          hm = re.match(r'^[ \t]{0,3}#{2,4}[ \t]+(.*\S)[ \t]*$', line)
+          if not hm:
+              continue
+          h = re.sub(r'\*\*|__|\*|`', '', hm.group(1)).strip()
+          h = re.sub(r'[\s:.\-\u2013\u2014]+$', '', h).strip()
+          sm = re.search(r'\(?\s*(\d+)\s*/\s*2\s*\)?$', h)
+          if not sm:
+              continue
+          head = re.sub(r'[\s:\-\u2013\u2014(\[]+$', '', h[:sm.start()]).strip()
+          nm = re.match(r'^(?:criterion[ \t]*)?(\d)[ \t]*[.):\-\u2013\u2014]?[ \t]*(.*)$',
+                        head, re.I)
+          if not nm:
+              continue
+          secs.append((nm.group(1), nm.group(2).strip(), sm.group(1)))
+
+      probs = []
+      if len(secs) != 7:
+          # A7: the body format is artifact_contract's contract. If the
+          # frontmatter is well-formed and internally consistent, pass with a note
+          # rather than hard-failing a judge whose subject is the arithmetic.
+          fscore = front.get("score")
+          fpass = front.get("pass")
+          frec = front.get("recommendation")
+          sane = (isinstance(fscore, int) and not isinstance(fscore, bool)
+                  and 0 <= fscore <= 14
+                  and isinstance(fpass, bool)
+                  and frec in ("accept", "revise")
+                  and (frec == "accept") == fpass
+                  and (not fpass or fscore >= 10))
+          if sane:
+              return (True, "located %d of the 7 '### N. <Criterion> (X/2)'"
+                            " sections; frontmatter self-consistent"
+                            " (score=%d pass=%s rec=%s) [NOTE: body section"
+                            " format is artifact_contract's contract]"
+                      % (len(secs), fscore, fpass, frec))
+          return (False, "located %d of the 7 '### N. <Criterion> (X/2)' sections"
+                         " (review-agent.md mandates 7) and the frontmatter is"
+                         " not self-consistent either: score=%r pass=%r"
+                         " recommendation=%r" % (len(secs), fscore, fpass, frec))
+      nums = [int(n) for n, _, _ in secs]
+      if sorted(nums) != [1, 2, 3, 4, 5, 6, 7]:
+          probs.append("criterion numbers %s are not 1-7" % nums)
+      vals = {}
+      for n, title, v in secs:
+          iv = int(v)
+          if iv > 2:
+              probs.append("criterion %s scored %d/2" % (n, iv))
+          vals[int(n)] = iv
+
+      score = front.get("score")
+      total = sum(vals.values())
+      if not isinstance(score, int) or isinstance(score, bool):
+          probs.append("frontmatter score %r is not an int" % score)
+      elif score != total:
+          probs.append("frontmatter score=%d but the 7 sections sum to %d"
+                       % (score, total))
+
+      # critical/major issues force their criterion to 0 (review-agent.md:104)
+      titles = {int(n): re.sub(r'[^a-z ]', '', t.lower()).strip()
+                for n, t, _ in secs}
+      issues = front.get("issues")
+      if issues is not None and not isinstance(issues, list):
+          probs.append("issues is not a list")
+          issues = []
+      for it in (issues or []):
+          if not isinstance(it, dict):
+              continue
+          sev = str(it.get("severity", "")).strip().lower()
+          if sev not in ("critical", "major"):
+              continue
+          crit = re.sub(r'[^a-z0-9 ]', '', str(it.get("criterion", "")).lower())
+          idx = None
+          dig = re.search(r'\d', crit)
+          for k, t in titles.items():
+              if crit and (t == crit.strip() or t in crit or crit.strip() in t):
+                  idx = k
+                  break
+          if idx is None and dig:
+              cand = int(dig.group(0))
+              if cand in vals:
+                  idx = cand
+          if idx is None:
+              continue
+          if vals.get(idx) != 0:
+              probs.append("%s issue on criterion %d (%s) but it scored %d/2 —"
+                           " review-agent.md forces 0"
+                           % (sev, idx, titles.get(idx, "?"), vals[idx]))
+
+      passed = front.get("pass")
+      if not isinstance(passed, bool):
+          probs.append("frontmatter pass %r is not a bool" % passed)
+      else:
+          want_pass = (total >= 10 and 0 not in vals.values())
+          if passed != want_pass:
+              probs.append("pass=%s but score %d with min criterion %d implies"
+                           " pass=%s" % (passed, total,
+                                         min(vals.values()) if vals else -1,
+                                         want_pass))
+          rec = front.get("recommendation")
+          if rec not in ("accept", "revise"):
+              probs.append("recommendation %r not in {accept, revise}" % rec)
+          elif (rec == "accept") != passed:
+              probs.append("recommendation=%s contradicts pass=%s"
+                           % (rec, passed))
+      if probs:
+          return (False, "; ".join(probs))
+      return (True, "reviewer arithmetic sound: 7 criteria %s = %d, pass=%s,"
+                    " rec=%s" % ([vals[k] for k in sorted(vals)], total,
+                                 front.get("pass"),
+                                 front.get("recommendation")))
+
+  - name: component_vocabulary
+    if: "annotations.get('valid_components')"
+    description: |
+      decompose-agent.md:61 is a MUST — "When assigning a component to an epic,
+      you MUST use a name from this list" (.context/rhai-components.txt) — and
+      submit.py enforces it downstream: validate_component (:95-105, :210-213)
+      strips any name not in the list, so the Jira epic is created with NO
+      component plus an `epic-creator-needs-component` label (:229-233). The
+      eval dataset schema restates it and says explicitly that mapping prose to
+      a canonical name "is part of the task under test". No judge read the list.
+
+      Wiring: a check judge only receives outputs["files"] and
+      outputs["annotations"], and .context/rhai-components.txt is provisioned
+      *input*, not a collected output — and it must not be added as an output
+      path, because output dirs are cleaned between runs and that would delete
+      the pipeline's own input. So the list is mirrored into each case's
+      annotations.yaml as `valid_components:` (present in all 30 cases,
+      generated from each case's own .context/rhai-components.txt: 13 names for
+      synthetic, 93 for real). The judge is gated on that key.
+
+      Value is prevention, concentrated on the untested real tier: a 93-name
+      production list against strategy bodies that name repos (odh-dashboard,
+      rhods-operator, feast-operator) rather than Jira components. All 29 epics
+      in the completed run used valid names, so nothing regresses; case-016 is a
+      dedicated synthetic probe for exactly this failure.
+    check: |
+      import re, yaml
+
+      def fm(t):
+          if not isinstance(t, str):
+              return {}
+          m = re.match(r'^---\s*\n(.*?\n)---\s*\n', t, re.DOTALL)
+          if not m:
+              return {}
+          try:
+              d = yaml.safe_load(m.group(1))
+          except Exception:
+              return {}
+          return d if isinstance(d, dict) else {}
+
+      ann = outputs.get("annotations") or {}
+      raw = ann.get("valid_components")
+      if not isinstance(raw, list) or not raw:
+          return (True, "annotations carry no valid_components list —"
+                        " check not applicable")
+      valid = {str(x).strip() for x in raw if str(x).strip()}
+      strat = str(ann.get("strat_id") or "")
+      files = {p: c for p, c in (outputs.get("files") or {}).items()
+               if isinstance(c, str)}
+      if not strat:
+          return (False, "annotations.yaml missing strat_id")
+      epat = re.compile(re.escape(strat) + r"-(?:BRANCH-[A-Z]-)?E\d{3}\.md$")
+      epics = {p.rsplit("/", 1)[-1]: fm(c) for p, c in sorted(files.items())
+               if "epic-tasks/" in p and epat.search(p)}
+      if not epics:
+          return (True, "no epic files to check (other judges cover that)")
+      bad, checked = [], 0
+      for name in sorted(epics):
+          comp = epics[name].get("component")
+          if not isinstance(comp, str) or not comp.strip():
+              continue  # missing/unparseable component is artifact_contract's
+          checked += 1
+          if comp.strip() not in valid:
+              bad.append("%s: component %r not in the canonical list"
+                         " (submit.py would strip it)" % (name, comp))
+      if bad:
+          return (False, "; ".join(bad[:8])
+                  + ("" if len(bad) <= 8 else " (+%d more)" % (len(bad) - 8)))
+      if not checked:
+          return (True, "no epic carries a readable component value")
+      return (True, "all %d epic components are canonical (of %d in the list)"
+              % (checked, len(valid)))
+
+  - name: decomposition_quality
+    description: |
+      Independent LLM grading of the decomposition against the source strategy —
+      deliberately does not trust the pipeline's internal reviewer, so it also
+      detects reviewer leniency drift.
+    score_range: [1, 5]
+    prompt: |
+      You are grading an epic decomposition produced from an RHAISTRAT strategy.
+
+      Case inputs (strat_id, strategy_title, and strategy_markdown — the full
+      source strategy):
+      {{ inputs }}
+
+      Dataset annotations (may declare expected_triage or other expectations):
+      {{ annotations }}
+
+      Produced artifacts (epic files, ai-signals rationales, decomposition
+      summary, adversarial review):
+      {{ outputs }}
+
+      Locate <strat_id>-decomposition.md and the sibling <strat_id>-E*.md epic
+      files under artifacts/epic-tasks/. Evaluate five dimensions:
+      1. HLR coverage — every P0/P1 requirement in strategy_markdown appears in
+         some epic's HLR Traceability section; nothing orphaned; priority
+         inheritance respected (an epic blocking P0 work is itself P0;
+         docs-authoring epics exempt).
+         Real-tier strategies (annotations tier: real) often tag requirements
+         [P0]/[P1] with no HLR-N identifiers, and some enumerate no prioritized
+         requirement list at all. Where that is the case, trace coverage against
+         the requirements as stated in the prose, acceptance criteria and
+         staff-engineer input instead, and do not penalize the absence of
+         HLR-N labels.
+      2. Epic boundaries — separate epics per component/team; no two epics
+         independently building the same data structure, UI surface, or API
+         endpoint; code vs content-authoring vs docs work not mixed in one epic;
+         no multi-sprint monoliths (target <= ~2 weeks each).
+      3. DAG quality — the Mermaid diagram's arrows run dependency --> dependent
+         and match every epic's frontmatter dependencies; edges are justified
+         (docs-authoring last, repo-onboarding before konflux-onboarding,
+         investigations gate their dependents); parallel-eligible work is not
+         artificially serialized.
+      4. Scope fidelity — the epics decompose, they do not design: no invented
+         API paths, CRD field names, env vars, caching policies, or response
+         formats absent from strategy_markdown. Epic bodies must not reference
+         sibling draft IDs like "E003".
+      5. Acceptance criteria — testable, traceable to the strategy, and
+         rule-mandated ACs present (rollback/feature-flag for replacement work,
+         technical review for docs-authoring, build-pipeline-green for konflux
+         chains).
+
+      If the decomposition summary declares triage (below-threshold or docs-only),
+      a single epic is correct by design — do not penalize missing decomposition
+      depth; instead judge whether triage_rationale is defensible against the
+      strategy.
+
+      Score 1-5:
+      5 = all five dimensions solid;
+      4 = one minor gap (e.g. a soft AC, one under-justified edge);
+      3 = one material gap (an unmapped P1, an unjustified edge, a boundary
+          overlap);
+      2 = multiple material gaps, or invented implementation detail;
+      1 = a P0 requirement uncovered, incoherent DAG, or epics unrelated to the
+          strategy.
+
+  - name: pipeline_protocol
+    description: |
+      Process gate over the dispatcher's behavior, graded from tool evidence rather than
+      self-report: state init before dispatch, wait-for-wave after every wave, no
+      hand-written YAML frontmatter, non-interactive, teardown ran.
+
+      FIX. Requirement 4 previously failed any run whose agents used
+      `cat > artifacts/... << 'EOF'`, on the assumption that the payload "likely" held
+      frontmatter. That assumption is wrong by construction: decompose-agent.md:244 and
+      :275 ("Write the body content (no frontmatter delimiters)") and review-agent.md:116
+      instruct exactly that pattern, followed by `scripts/frontmatter.py set`
+      (decompose-agent.md:252-257, :285-302; review-agent.md:148-153). The rule the
+      requirement actually enforces is CLAUDE.md:28 — frontmatter is set through
+      scripts/frontmatter.py, "never write YAML by hand" — and CLAUDE.md:45's anti-cat
+      rule is scoped to tmp/ state persistence, not artifact bodies.
+      Measured on the 2026-08-17 run: case-005 has 17 heredocs writing artifact bodies,
+      0 of them containing a `---` delimiter, alongside 20 `frontmatter.py set` calls;
+      the judge returned false and, because the reward gated on it, zeroed the reward on
+      the run's best case (decomposition_quality 5/5).
+      Two further precision fixes, both evidence-hygiene rather than rule changes:
+      (a) the prompt now states what the trace physically cannot show — Bash commands are
+      truncated at 200 chars and Write/Edit render as a bare file path
+      (agent_eval/events.py `_format_tool_input`) — and forbids inferring a violation from
+      invisible content; (b) requirement 3 distinguishes a missing barrier (violation,
+      per CLAUDE.md:88-94) from a read-only diagnostic call placed before it (a NOTE),
+      and states that consecutive wait-for-wave calls are the prescribed exit-3 retry,
+      since exit codes are not in the trace at all.
+
+      D3: `samples: 3`. This is the only stochastic judge inside the reward formula.
+      The harness reduces a sampled bool by strict majority (ties fail) and records
+      stability{pass_count, values, stable} plus per-sample rationales when the samples
+      disagree, so remaining variance becomes visible instead of silently flipping a
+      gate. Cost is 3x this judge's own calls, which budget_check does not count.
+    feedback_type: bool
+    samples: 3
+    prompt: |
+      Evaluate whether the top-level agent (the dispatcher) followed the epic-decompose
+      dispatcher protocol. Grade against the evidence below, never against the agent's own
+      claims about what it did.
+
+      Summary of the agent's tool activity:
+      {{ evidence }}
+
+      Chronological tool trace. Unprefixed lines are the dispatcher; lines prefixed
+      "[subagent]" are the phase agents it launched:
+      {{ tool_trace }}
+
+      Visible text the agent produced:
+      {{ conversation }}
+
+      ## How to read this evidence — the trace is lossy
+
+      - Bash commands are truncated at 200 characters. For a heredoc
+        (`cat > FILE << 'EOF'`) the visible portion is the command line plus the FIRST FEW
+        LINES OF THE PAYLOAD, and nothing after that.
+      - Write and Edit calls render as a bare file path. Their content is never shown.
+      - Exit codes and command output are not in the trace at all.
+
+      Therefore: judge only what is visible. Never infer a violation from what a truncated
+      command or an unseen Write "probably" contained, and never treat the absence of a
+      line as proof of a violation. If the trace does not positively show a violation, the
+      requirement passes.
+
+      ## Required behavior (from SKILL.md and CLAUDE.md)
+
+      1. `python3 scripts/pipeline_state.py init` ran before any wave was dispatched, and
+         ID lists were written with `python3 scripts/state.py write-ids` rather than
+         echo/cat redirection (SKILL.md Setup steps 1-2; CLAUDE.md "State Persistence",
+         which requires state.py "instead of inline bash commands (cat, echo, mkdir)").
+
+      2. The loop was driven by `python3 scripts/pipeline_state.py next-action`, and every
+         `launch_wave` action was dispatched as Agent call(s) whose prompt embeds the phase
+         prompt file and the per-ID vars (SKILL.md "Dispatch Loop", steps 1-2).
+
+      3. Every wave launch was followed by `python3 scripts/pipeline_state.py
+         wait-for-wave` before the dispatcher advanced to the next `next-action` or phase
+         command (SKILL.md "Dispatch Loop" step 2; CLAUDE.md "Pipeline Execution
+         Constraint" items 2-3).
+         - Consecutive repeated `wait-for-wave` calls are the prescribed exit-code-3 retry,
+           not a violation. Exit codes are invisible here, so never fault the retry pattern
+           and never claim the agent "broke out" of it unless it advanced the phase.
+         - A read-only diagnostic call (`ls`, `head`, `frontmatter.py read`,
+           `state.py read`) sitting between the launch and the first `wait-for-wave` is a
+           deviation from the letter of the rule ("your next Bash call MUST be
+           wait-for-wave"). Record it as a NOTE in your rationale; it does not by itself
+           make the answer false.
+         - It IS a violation when a wave has no `wait-for-wave` before the dispatcher moves
+           on, or when the barrier is replaced by polling artifacts/state in a loop or by
+           waiting on Agent-completion notifications.
+         - CAVEAT: your evidence is a flattened tool trace WITHOUT turn boundaries, so
+           you cannot see the notification-idling pattern (dispatcher ends its turn
+           after launching a wave and is resumed by the harness; wait-for-wave then
+           runs only post-resume). That specific pattern is detected deterministically
+           by the dispatcher_turn_discipline judge from session events — do NOT guess
+           at it here. Judge only what the trace can actually show: ordering of
+           launches, barriers and phase advances.
+
+      4. YAML frontmatter was never hand-authored. CLAUDE.md ("Frontmatter") requires
+         frontmatter to be read and set through `scripts/frontmatter.py` and to "never
+         write YAML by hand". Note precisely what that rule does NOT prohibit:
+         - The phase prompts instruct agents to write the artifact BODY first, explicitly
+           "(no frontmatter delimiters)", and only then set frontmatter via the script
+           (decompose-agent.md Step 8a/8b; review-agent.md Step 4). So a
+           `cat > artifacts/... << 'EOF'` — or a Write/Edit — whose visible payload begins
+           with markdown body text such as `# <Title>`, `## Description` or `## Epic List`
+           is COMPLIANT, and stays compliant when followed by `frontmatter.py set` on the
+           same path.
+         - It does not matter which agent runs `frontmatter.py` — dispatcher or subagent.
+           The rule constrains the mechanism, not the caller.
+         Fail this requirement ONLY on positive, visible evidence of hand-written
+         frontmatter: a heredoc/echo/printf/tee payload whose visible lines include a
+         `---` frontmatter delimiter line or top-of-file frontmatter keys (`epic_id:`,
+         `parent_strat:`, `strat_id:`, `score:`, `pass:`, `recommendation:`,
+         `dependencies:`, `ai_signals:` ...), or a sed/awk/in-place edit rewriting a
+         frontmatter block. The absence of a `frontmatter.py set` call for some artifact is
+         NOT sufficient evidence, because long commands are truncated.
+
+      5. The agent asked the user no questions and never paused for confirmation (SKILL.md:
+         "You are a non-interactive epic decomposition pipeline. Do not ask questions or
+         wait for confirmation."; CLAUDE.md "Pipeline Execution Constraint" item 1: a
+         text-only response during pipeline execution terminates the CI process).
+
+      6. After the phase reached DONE, `python3 scripts/batch_summary.py --counts-only ...`
+         ran as teardown (SKILL.md "Teardown").
+
+      Environment notes, neither of which is a violation:
+      - The bootstrap network scripts (fetch_components.py, fetch_strategy.py) may have
+        been denied by the eval harness with a message that the files are pre-provisioned.
+        Proceeding past that denial is CORRECT behavior.
+      - Re-running `pipeline_state.py init`, re-writing the ID lists, or `cd`-ing and
+        running diagnostic commands to recover from a working-directory or provisioning
+        problem violates none of the six requirements — including the diagnostics that
+        accompany such a recovery. Note them in the rationale; do not fail on them. This
+        takes precedence over the polling clause in requirement 3, which targets a
+        dispatcher that substitutes its own polling for a barrier it never called.
+
+      The six requirements above are exhaustive. Do not fail a case for conduct that
+      violates none of them — record such observations as NOTES instead.
+
+      Answer true only if all six requirements hold. Answer false otherwise, and for every
+      violated requirement quote the trace step number(s) that show the violation.
+
+  - name: dispatcher_turn_discipline
+    description: |
+      Deterministic detector for the notification-idling pattern the LLM
+      pipeline_protocol judge is structurally blind to (its flattened trace has
+      no turn boundaries). CLAUDE.md's Pipeline Execution Constraint: a
+      text-only response (no tool call) during pipeline execution terminates
+      the CI process, and the dispatcher must not wait on Agent-completion
+      notifications instead of the blocking wait-for-wave barrier. A violating
+      dispatcher ends its turn mid-pipeline and only survives because this
+      harness auto-resumes the session; the resumed segment then continues the
+      pipeline. Detection parses the RAW stdout stream (outputs["stdout"],
+      requires traces.stdout: true): session segments are system/init events,
+      and a violation is any post-first-init segment that performs tool work —
+      a resume that works means the previous turn ended mid-pipeline. NOT
+      events.json: that transform batches all result events at the tail, which
+      destroys segment ordering. Calibrated on run 2026-08-19-claude-opus-4-6:
+      flags exactly the 8 audited violators (005, 009, 010, 018, 019, 020, 025,
+      030); passes case-007's benign post-completion resume (its resumed
+      segment made no tool calls) and all 21 single-segment cases.
+    check: |
+      import json
+      stdout_text = outputs.get("stdout") or ""
+      if not stdout_text.strip():
+          return (True, "no stdout trace captured - not assessable (vacuous pass)")
+      seq = []
+      for line in stdout_text.splitlines():
+          line = line.strip()
+          if not line:
+              continue
+          try:
+              e = json.loads(line)
+          except (ValueError, json.JSONDecodeError):
+              continue
+          t = e.get("type")
+          if t == "system" and e.get("subtype") == "init":
+              seq.append("init")
+          elif t == "assistant" and not e.get("parent_tool_use_id"):
+              blocks = e.get("message", {}).get("content", [])
+              if isinstance(blocks, list) and any(
+                      b.get("type") == "tool_use" for b in blocks):
+                  seq.append("tooluse")
+      n_segments = seq.count("init")
+      if n_segments <= 1:
+          return (True, "single-segment session: dispatcher never idled on notifications")
+      inits_seen = 0
+      resumed_with_work = 0
+      seg_flagged = False
+      for k in seq:
+          if k == "init":
+              inits_seen += 1
+              seg_flagged = False
+          elif k == "tooluse" and inits_seen > 1 and not seg_flagged:
+              resumed_with_work += 1
+              seg_flagged = True
+      if resumed_with_work == 0:
+          return (True, "%d session segments but no resumed segment performed tool "
+                        "work (benign post-completion resume)" % n_segments)
+      return (False, "%d session segments, %d resumed mid-pipeline: the dispatcher "
+                     "ended its turn while pipeline work remained and relied on "
+                     "harness auto-resume instead of the blocking wait-for-wave "
+                     "barrier - in real headless CI this run would have died at the "
+                     "first such turn (CLAUDE.md Pipeline Execution Constraint)"
+                     % (n_segments, resumed_with_work))
+
+  - name: sme_input_fidelity
+    if: "annotations.get('sme_substantive')"
+    description: |
+      Real-tier only. Grades the one Step 1.5 obligation nothing else covers:
+      decompose-agent.md:51-57 says that when a strategy carries a Staff Engineer Input
+      section that is non-empty "beyond template placeholder text", the agent must parse
+      it first, prefer it over the AI-generated Technical Approach wherever they diverge,
+      and "log each override for traceability in the decomposition summary".
+      No existing judge mentions SME input, decomposition_quality's five dimensions do
+      not, and the mandated summary sections (decompose-agent.md:244-250) contain no
+      override log — so nothing forces the behavior to surface. On the real tier the SME
+      section is the only human ground truth in the dataset.
+
+      C1 — the trigger is the dataset flag `sme_substantive`, not text-sniffing of the
+      rendered input. The original expression
+      ("Staff Engineer" in the inputs and "Add technical corrections" not in the inputs)
+      is correct TODAY — verified over all 30 cases, firing on exactly the four
+      substantive ones — but it silently skips any future case that keeps the boilerplate
+      ABOVE real content, which contradicts this judge's own intent. The flag mirrors the
+      valid_components precedent and is set on case-022 (19.6k chars of SME input),
+      case-024 (6.3k), case-025 (4.4k) and case-030 (2.5k); the other six real cases carry
+      355-360 chars of italic template instructions, or the HTML-comment variant in
+      case-023. The prompt's N/A path stays as a second line of defence.
+
+      Numeric and deliberately un-thresholded: no real case has ever been run, so the
+      judge must not gate anything until it is calibrated. It is also never named in the
+      reward formula — an `if:`-skipped judge is absent from the formula namespace and
+      would zero the whole reward.
+
+      Format-agnostic by construction: it keys off SME heading text (which varies:
+      "## Staff Engineer Input" vs "## Staff Engineer / SME Input"), never off HLR-N ids,
+      section order, or the presence of a prioritized requirement list — and it tolerates
+      the case where the AI-generated Technical Approach is an attachment absent from the
+      snapshot (case-024).
+    score_range: [1, 5]
+    prompt: |
+      You are grading ONE narrow property of an epic decomposition: its fidelity to the
+      Staff Engineer / SME Input section of the source strategy. Nothing else.
+
+      Rule under test — skills/epic-decompose/prompts/decompose-agent.md, "Step 1.5: Parse
+      Staff Engineer Input": if the strategy contains a Staff Engineer Input section that
+      is non-empty beyond template placeholder text, the decompose agent must
+      (a) parse it first — it takes precedence, (b) use the Staff Engineer Input wherever
+      it diverges from the AI-generated Technical Approach, and (c) log each override for
+      traceability in the decomposition summary.
+
+      Case inputs — strat_id, strategy_title, and strategy_markdown, the full source
+      strategy including its Staff Engineer Input section:
+      {{ inputs }}
+
+      Dataset annotations. These are real production snapshots, so the notes are a
+      grader checklist rather than a ground-truth answer: use any SME-related item as a
+      hint, ignore the rest, and never treat a missing note as evidence of correctness.
+      {{ annotations }}
+
+      Produced artifacts (per-epic files, ai-signals rationales, decomposition summary,
+      adversarial review) under artifacts/epic-tasks/ and artifacts/epic-reviews/:
+      {{ outputs }}
+
+      ## Step 1 — locate the SME section and decide whether the rule fires
+
+      These strategies are verbatim production text: the heading varies ("## Staff Engineer
+      Input", "## Staff Engineer / SME Input", "### SME Input"), section order varies, there
+      are NO HLR-N identifiers, and some strategies enumerate no prioritized requirement
+      list at all. Locate the section by heading text, not by position, and read it in full.
+
+      The rule does NOT fire when that section holds only template placeholder text —
+      italic or HTML-comment instructions addressed to a human reviewer, e.g. "Add
+      technical corrections, architectural direction, component preferences, or domain
+      expertise below..." — with no substantive technical content. If that is what you
+      find, or there is no such section, score 5 and begin your rationale with "N/A —"
+      followed by what you found. Do not invent an obligation that Step 1.5 does not
+      impose.
+
+      ## Step 2 — extract the checkable SME statements
+
+      From a substantive section, list the statements that actually constrain the
+      decomposition:
+      - corrections — an explicit claim in the strategy is declared wrong ("the strategy's
+        claim that X is incorrect", "that estimate can be eliminated");
+      - descoping — work the SME directs to be removed ("no Konflux onboarding is needed",
+        "remove the latency-threshold open questions", "capability Y is deferred to another
+        strategy; remove it from components, teams and acceptance criteria");
+      - direction — a hard external dependency, a fallback plus a requested go/no-go
+        decision gate, reuse of an existing pattern or image, sizing/benchmark guidance,
+        ownership or team split;
+      - confirmation — parts the SME endorses. These constrain nothing; do not grade them.
+
+      Where the strategy has an explicit "Technical Approach" (or equivalent AI-generated
+      section), check the epics against the SME wherever the two diverge. Where it has none
+      — the AI-generated body is sometimes an attachment that is not part of the snapshot —
+      compare the SME statements against the strategy's own summary, problem statement,
+      acceptance criteria and open questions instead. An SME correction may quote a claim
+      that lived only in that attachment and is therefore not findable in the text you were
+      given; grade whether the EPICS honor the correction, never whether you can locate the
+      claim being corrected.
+
+      ## Step 3 — grade fidelity
+
+      A. Precedence. Every SME correction is reflected in the epic set; no epic implements
+         the superseded claim.
+      B. Descoping. Work the SME directed to be removed does not reappear as an epic, an
+         epic scope item, or an acceptance criterion. Recreating it is scope inflation.
+      C. Direction placement. SME-stated hard dependencies, fallbacks/decision gates, reuse
+         guidance and sizing guidance appear in a structurally appropriate place — a
+         dependency, an Investigation, a gate, a health warning, or an AC — without being
+         inflated into invented implementation design (decompose-agent.md "Scope
+         constraint: decompose, don't design"). Specifics the SME section itself states
+         (API paths, image names, label keys, file names) are part of the strategy: reusing
+         them is not invention. Only detail present in neither the strategy nor the SME
+         section counts as invention.
+      D. Override log. The decomposition summary records the divergences it took from the
+         AI-generated strategy on SME authority (decompose-agent.md Step 1.5, third
+         bullet). An explicit override list is full credit; overrides traceable inside
+         Health Warnings, the DAG Justification table, or epic notes are partial credit;
+         nothing recorded anywhere is no credit for this dimension.
+      E. No fabrication. Nothing is attributed to the SME that the section does not say.
+
+      Grade ONLY these. HLR coverage, DAG shape, epic boundaries and acceptance-criteria
+      quality are graded by a separate judge — do not re-grade them, and do not let overall
+      decomposition quality move this score in either direction.
+
+      Score 1-5:
+      5 = every correction and descoping direction honored, structural directions placed
+          appropriately, and the summary explicitly records the overrides;
+      4 = every correction and descoping direction honored, but the override record is
+          implicit or partial, or one structural direction is placed loosely;
+      3 = one correction or descoping direction missed (an epic or AC survives that the SME
+          said to correct or remove), or the decomposition is otherwise faithful but records
+          no overrides at all;
+      2 = several corrections/descoping directions missed, or the epic set follows the
+          superseded AI-generated text where the SME explicitly contradicts it;
+      1 = the SME section was effectively ignored, or the epic set contradicts its explicit
+          direction on the central question of the strategy.
+
+      If no epic files for this strat_id appear in the artifacts, score 1 and state that no
+      decomposition was produced.
+
+      In your rationale, quote the specific SME statements you checked (short quotes) and
+      name the specific epic file or summary section that honors or contradicts each one.
+
+# Thresholds — not the reward — are the CI enforcement mechanism for the
+# deterministic checks (see the reward comment below). A judge lands here only
+# once its false-positive behavior is understood.
+thresholds:
+  budget_check:
+    min_pass_rate: 1.0
+  artifact_contract:
+    min_pass_rate: 1.0
+  dag_valid:
+    min_pass_rate: 1.0
+  implementation_type_rules:
+    min_pass_rate: 1.0      # unconditional; case-006's Rule 10 violation is a real, reproduced skill defect
+  dispatcher_turn_discipline:
+    min_pass_rate: 1.0      # calibrated on 2026-08-19: flags exactly the 8 audited
+                            # notification-idling cases, 0 false positives across 30.
+                            # Stays red until the dispatcher (SKILL.md) is hardened.
+  review_discipline:
+    min_pass_rate: 1.0      # safe only because of A8 (missing review file = vacuous pass)
+  component_vocabulary:
+    min_pass_rate: 1.0      # `if:` fires 30/30 — every annotations.yaml carries valid_components
+  triage_expectation:
+    # `if:` fires on 2/30 cases after A9 (case-004 docs-only, case-009 single
+    # component/P2-only). A run whose case subset excludes both leaves pass_rate
+    # None, which detect_regressions reports as an "n/a" regression rather than a
+    # skip — expect that on a real-tier-only run.
+    min_pass_rate: 1.0
+  decomposition_quality:
+    min_mean: 3.5
+  pipeline_protocol:
+    min_pass_rate: 1.0
+  # --- deliberately NOT thresholded ---
+  # mandated_acceptance_criteria (B9): one calibration run first. Its Rule 24/25
+  #   phrase families have never been measured against real-tier AC wording.
+  # run_report_consistent (A5): unresolved whether case-002's missing
+  #   artifacts/decompose-runs/ is a pipeline gap or an artifact-collection gap.
+  # sme_input_fidelity: uncalibrated numeric, and `if:` fires on 4/30 cases, so a
+  #   min_mean would turn every synthetic-only run into an "n/a" regression.
+  # A threshold naming a nonexistent judge is silently ignored by
+  # score.py:detect_regressions, so retiring a judge must delete its entry too —
+  # that is why self_review_score's min_mean went with the judge.
+
+# No `reward:` block: the single-scalar reward is not in use. Scoring therefore
+# falls back to the harness default (boolean judges gate, numeric judges are
+# normalized and averaged), so the report's Reward column will read ~0 whenever
+# any boolean judge fails — that is expected and carries no signal here.
+# `thresholds` above is the CI enforcement mechanism.
+# To reinstate a reward, prefer an explicit named-gate formula over `gate: true`:
+#   formula: "budget_check * artifact_contract * dag_valid * pipeline_protocol * decomposition_quality"
+#   gate: false
+# and never name an `if:`-conditional judge in it (a skipped judge is absent from
+# the namespace -> NameError -> the whole reward degrades to 0.0).

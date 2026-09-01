@@ -1,0 +1,343 @@
+strat_id: RHAISTRAT-8003
+strategy_title: RHAII MaaS on xKS
+strategy_markdown: |
+  #### **Problem Statement**
+
+  Red Hat AI Inference (RHAII) targets non-OpenShift Kubernetes environments (AKS, CKS, EKS, GKE), but MaaS - a key component of the RHAII product definition - has no validated deployment path or user management strategy for xKS.
+
+  **Current State:**
+
+  * MaaS is in Dev Preview on RHOAI 3.0 with OpenShift-specific dependencies
+  * No validated deployment of MaaS on xKS environments exists
+  * User management relies on Kubernetes RBAC identity mapping - unavailable on xKS
+
+  **User Scenario:** A platform team wants to deploy RHAII on Azure Kubernetes Service (AKS) with MaaS capabilities for multi-tenant inference API management. They need user authentication, subscription management, and rate limiting - but these depend on identity infrastructure that doesn't exist on xKS the way it does on OpenShift.
+
+  —
+
+  #### **Business Alignment**
+
+  **What is the Business Value and/or Impact?**
+
+  * Enables RHAII adoption on xKS - the primary target platform for the new product
+  * MaaS is explicitly listed as part of RHAII MVP (Dev Preview)
+  * Blocking dependency for Dashboard/UI scope decisions
+  * Required for Summit (May 2026) product announcement
+
+  **Red Hat AI Outcome Alignment:**
+
+  * Customer Success: Enables MaaS capabilities for xKS customers
+  * Competitive Positioning: Enterprise-grade inference API management on any Kubernetes
+
+  —
+
+  #### **Proposed Solution/Rationale**
+
+  Validate MaaS deployment on xKS and define user management strategy for non-OpenShift environments.
+
+  **Solution Components:**
+
+  1. **User Management Strategy for xKS:**
+
+    - Define authentication approach without k8s identity mapping   - Evaluate OIDC/OAuth2 integration options   - Document user identity flow for xKS deployments
+
+  1. **MaaS xKS Deployment Validation:**
+
+    - Deploy current MaaS on AKS/CKS test environment   - Document what works vs. what breaks   - Identify engineering delta to make it functional
+
+  **What Gets Delivered (Dev Preview):**
+
+  * Validated MaaS deployment on at least one xKS platform (AKS or CKS)
+  * User authentication solution (external OIDC)
+  * Core MaaS functionality: subscription/tier management, token rate limiting, API access
+
+  **What Users Must Do:**
+
+  * Provide their own identity provider (OIDC-compatible)
+
+  **Key Assumptions:**
+
+  * Dev Preview = functional demonstration, not production-ready
+  * Significant scope reduction from RHOAI MaaS GA (see below)
+
+  —
+
+  #### **Scope Reduction from RHOAI MaaS GA**
+
+  RHAII MaaS xKS Dev Preview is explicitly scoped down from RHOAI MaaS 3.4 GA. The following table clarifies what's included vs. excluded:
+
+  **Included in xKS Dev Preview:**
+
+  | Feature | Notes |
+  | --- | --- |
+  | Token rate limiting | Core RHCL/Kuadrant functionality |
+  | Tier/subscription management | Basic tier/subscription CRUD both are acceptable |
+  | External OIDC authentication | Required |
+  | API access control | As usual |
+
+  **Excluded from xKS Dev Preview (Defer to future releases):**
+
+  | Feature | Reason |
+  | --- | --- |
+  | Operator Integration | xKS uses Helm-based installation |
+
+  —
+
+  #### **Acceptance Criteria**
+
+  **Deployment Validation:**
+
+  * \[ \] MaaS successfully deployed on at least on xKS platform (AKS AND CKS)
+  * \[ \] Core functionality validated: subscription management, rate limiting
+  * \[ \] Known limitations documented
+
+  **User Management:**
+
+  * \[ \] User authentication strategy defined and documented
+  * \[ \] External OIDC integration validated (or alternative approach)
+  * \[ \] User identity flow documented for xKS deployments
+
+  —
+
+  #### **Affected Customers/Partners & Scope**
+
+  **Current/Potential Customers:**
+
+  * All RHAII xKS deployments (AKS, CoreWeave, EKS, GKE)
+  * Enterprises requiring multi-tenant inference API management
+  * Partners deploying RHAII on managed Kubernetes services
+
+  **Scope:**
+
+  * Impact: All RHAII xKS deployments requiring MaaS
+  * Timeline: Required for RHAII Tech Preview (Summit May 2026)
+
+  —
+
+  #### **Reference Documents/Links**
+
+  * RHAISTRAT-7177 - Red Hat AI Inference Outcome
+  * RHAIRFE-7156 - RHAII Dashboard/UI (blocked by MaaS xKS clarity)
+  * [Red Hat AI Inference Product Definition]([internal link removed]) - the product manager's product definition deck showing MaaS as MVP component
+  * [MaaS GA Scope Definition]([internal link removed]) - RHOAI MaaS 3.4 GA scope
+  * Slack: #internal-discussion-channel - Jan 26 discussion on MaaS xKS ownership
+  * Slack: #internal-product-forum - Jan 23 discussion on user management dependency
+
+  —
+
+  #### **Open Questions**
+
+  **User Management:**
+
+  * What authentication approach should we use for xKS? (External OIDC? BYO identity provider?)
+  * Can we leverage existing MaaS AuthPolicy with external OIDC, or are changes needed?
+  * How do we map external identities to MaaS subscriptions/tiers?
+
+  ## Strategy (AI Generated by Agentic SDLC Pipeline)
+
+  ### TL;DR
+
+  Deploy MaaS (Models as a Service) on non-OpenShift Kubernetes environments (xKS: CKS, AKS, EKS, GKE) as a Dev Preview for RHAII, using MaaS 3.4 GA as a baseline with Helm-based installation and external OIDC authentication replacing OpenShift-specific identity infrastructure. CKS (CoreWeave Kubernetes Service) is the priority platform per Staff Engineer Input. This is scoped to Dev Preview — functional demonstration, not production-ready. Observability (metrics, logging, tracing) is a core value proposition per Staff Engineer Input.
+
+  **Components**: models-as-a-service (maas-controller, maas-api, payload-processing BBR ext_proc), Kuadrant/RHCL (Authorino, Limitador), Gateway API, PostgreSQL, observability (Prometheus, Perses dashboards, structured logging)
+
+  ### Technical Approach
+
+  MaaS on RHOAI 3.4 GA relies on three OpenShift-specific dependencies: (1) OpenShift's built-in OAuth/OIDC for user identity (KubernetesTokenReview against the OpenShift API server), (2) OLM-based operator installation for the maas-controller and Kuadrant components, and (3) the `openshift-default` GatewayClass with Istio data plane for the MaaS gateway. For xKS Dev Preview, each of these must be replaced or adapted to work on non-OpenShift managed Kubernetes (CKS, AKS, EKS, GKE).
+
+  **User Management Strategy for xKS**
+
+  The MaaS architecture (architecture context: models-as-a-service.md) consists of three primary components: (1) maas-controller (operator managing 5 CRDs: Tenant, MaaSModelRef, MaaSAuthPolicy, MaaSSubscription, ExternalModel), (2) maas-api (REST service for OpenAI-compatible model listing, API key lifecycle management, subscription selection), and (3) payload-processing BBR ext_proc server (Envoy external processor for request transformations). Authentication enforcement is handled by Kuadrant Authorino via AuthPolicy CRs that the maas-controller generates and aggregates per model.
+
+  On RHOAI, Authorino uses KubernetesTokenReview to validate Bearer tokens against the OpenShift API server's identity mapping. On xKS, managed Kubernetes services do not expose the same identity infrastructure. The proposed approach (RFE comment from Ines Calderhook: "Utilize OIDC work planned for 3.4 for authentication") is to configure Authorino to use external OIDC validation instead of KubernetesTokenReview.
+
+  The customer provides their own OIDC-compatible identity provider (Keycloak, Entra ID, Google Identity Platform, Cognito, or other standards-compliant OIDC providers). The MaaS AuthPolicy resources (architecture context: deployment/base/maas-api/policies/auth-policy.yaml) would be updated to use Authorino's `oidc` identity source with the customer's OIDC issuer URL and JWKS endpoint. The Tenant CRD already supports external OIDC configuration (architecture context: Tenant CRD spec includes `oidcIssuerURL`, `oidcClientID`, `oidcAudience`), so this is a configuration change rather than a code change for basic OIDC integration. API key authentication (the `sk-oai-*` flow) requires no changes — it already uses the maas-api callback validation path (`/internal/v1/api-keys/validate` endpoint via Authorino HTTP callback), which is OIDC-agnostic.
+
+  The MaaSSubscription controller maps rate limiting tiers to user groups via CEL predicates on `auth.identity.groups` (architecture context: maas-controller/pkg/controller/maas/maassubscription_controller.go). On xKS, user group claims must be sourced from the OIDC token's group claim rather than Kubernetes RBAC groups. OIDC group claim formats vary across identity providers: Entra ID uses `groups`, Cognito uses `cognito:groups`, Google Identity Platform may use custom claims. The controller MUST support configurable claim path mapping to extract groups from different OIDC token formats. Implementation approach: add a `groupClaimPath` field to the Tenant CRD (default: `auth.identity.groups`) that is passed through to the MaaSSubscription controller's CEL predicate generation. This allows the claim path to be configured per deployment without code changes. If the Tenant CRD is frozen in MaaS 3.4 GA, the fallback is to document the required claim format and push IdP configuration burden to customers.
+
+  **Deployment Strategy**
+
+  xKS uses Helm-based installation (no OLM). The MaaS components (maas-api, maas-controller, payload-processing) must be packaged as Helm charts with configurable values for: gateway class name (not `openshift-default`), OIDC issuer configuration (issuer URL, client ID, audience, group claim path), TLS certificate source (cert-manager instead of OpenShift service-CA auto-generated certificates), PostgreSQL connection (may be shared with other RHAII components or dedicated), and group claim path mapping.
+
+  The MaaS gateway must use a GatewayClass available on the target xKS platform. CKS-specific validation (priority platform per Staff Engineer Input): CoreWeave deploys with Istio service mesh; the MaaS Helm chart must support `istio` GatewayClass with appropriate TLS and mTLS configuration for Istio's control plane integration. The architecture context confirms MaaS uses Gateway API HTTPRoutes (models-as-a-service.md: Ingress section documents HTTPRoute-based routing), which are GatewayClass-agnostic. Other validated options for future platforms: `envoy-gateway` (multi-platform), `azure-application-gateway` (AKS).
+
+  **Kuadrant (RHCL) Deployment on xKS**
+
+  RHCL (Red Hat Common Libraries) provides Kuadrant (Authorino + Limitador) for MaaS authentication and rate limiting. On RHOAI, RHCL deploys via OLM. On xKS (Helm-only), official RHCL xKS support must be confirmed with the OpenShift team — this is a strategic dependency.
+
+  Deployment options (priority order):
+
+  1. **Primary**: RHCL Helm charts (requires OpenShift team commitment)
+  2. **Fallback**: Standalone Authorino + Limitador via Helm
+  3. **Contingency**: Direct Envoy ext_authz integration
+
+  Sprint 1 validation: Confirm RHCL xKS support commitment. If not committed, escalate to product leadership.
+
+  **Observability Strategy**
+
+  Observability is a core value proposition for MaaS on xKS. The xKS implementation must deliver:
+
+  1. **Metrics (P0)**: Token usage, rate limiting enforcement, API key lifecycle, inference latency. Requires Prometheus metrics instrumentation in maas-api (/metrics endpoint) and Perses dashboards.
+  2. **Logging (P1)**: Structured JSON logs for authentication decisions (Authorino), rate limit enforcement (Limitador), API key validation (maas-api). Integrate with CKS Grafana Loki.
+  3. **Tracing (P2)**: Distributed tracing through gateway → Authorino → Limitador → payload-processing → backend using OpenTelemetry.
+
+  **Validation Approach**
+
+  Deploy MaaS 3.4 GA codebase on CKS first (priority platform per Staff Engineer Input: "CKS (CoreWeave Kubernetes Service) is the most important and initial flavor of Kubernetes to support for RHAII MaaS on xKS. Validation, deployment strategy, and initial Helm chart work must prioritize CKS before AKS, EKS, or GKE."). Then validate on AKS (satisfies "AKS AND CKS" acceptance criterion from RFE). Document what works, what breaks, and the engineering delta (code changes, configuration changes, Helm chart packaging).
+
+  Known risk: MaaS 3.4 GA code freeze was late March 2026 per RFE comment from Desmond Ferraby; it is now early May 2026, meaning the stable build should be available but integration timeline is tight for Summit (May 2026). Mitigation: obtain MaaS 3.4 RC build by April 27 (latest); begin CKS validation (priority platform) in parallel with RC testing; pre-identify MaaS 3.4 features that can be deferred if validation reveals blockers; maintain fallback demo using RHOAI 3.3 MaaS as proof-of-concept if 3.4 integration fails.
+
+  ### Affected Components
+
+  | Component | Change | Owner Team |
+  | --- | --- | --- |
+  | models-as-a-service (maas-api) | Add OIDC identity source configuration; Helm chart packaging; remove OpenShift-specific assumptions; add Prometheus metrics for API key lifecycle, token usage, access patterns | MaaS |
+  | models-as-a-service (maas-controller) | Configurable group claim mapping for OIDC tokens in CEL predicates; Helm chart packaging | MaaS |
+  | Kuadrant (Authorino) | Configuration only -- use OIDC instead of KubernetesTokenReview; structured logging for auth decisions | RHCL / OpenShift (external) |
+  | Kuadrant (Limitador) | No code changes -- TokenRateLimitPolicy works on any K8s; structured logging for rate limit enforcement | RHCL / OpenShift (external) |
+  | Gateway API | Use xKS-native GatewayClass instead of openshift-default (prioritize Istio for CKS) | Platform / xKS |
+  | Observability (Prometheus, Perses) | Deploy Perses dashboards for MaaS metrics; integrate with xKS Prometheus instance | MaaS / xKS Platform |
+
+  ### Impacted Teams
+
+  | Team | Components Owned | Involvement |
+  | --- | --- | --- |
+  | MaaS | models-as-a-service | Primary: OIDC integration, Helm charts, CKS validation, observability instrumentation |
+  | xKS Platform | RHAII installation tooling | Secondary: Helm chart integration with RHAII xKS deployment strategy; observability integration with CKS Prometheus/Loki |
+  | RHCL / OpenShift | Kuadrant (Authorino, Limitador) | Critical: RHCL official xKS support commitment and validation; OIDC configuration guidance; structured logging for auth/rate-limit events |
+
+  ### High Level Requirements
+
+  * \[P0\] MaaS successfully deployed on CKS (priority platform per Staff Engineer Input)
+  * \[P0\] MaaS successfully deployed on AKS (RFE acceptance criterion: "AKS AND CKS")
+  * \[P0\] Token rate limiting functional on xKS
+  * \[P0\] External OIDC authentication validated for user identity
+  * \[P0\] API key authentication (sk-oai-\* flow) functional on xKS
+  * \[P0\] Configurable OIDC group claim path mapping (supports Entra ID `groups`, Cognito `cognito:groups`, custom claims)
+  * \[P0\] RHCL official xKS support status confirmed and deployment mechanism validated (per Staff Engineer Input)
+  * \[P0\] Observability metrics functional: token usage, rate limiting enforcement, API key lifecycle events (per Staff Engineer Input)
+  * \[P1\] Tier/subscription management functional with OIDC group claims
+  * \[P1\] Observability logging functional: authentication events, rate limit enforcement, subscription selection (per Staff Engineer Input)
+  * \[P1\] Known limitations documented
+  * \[P2\] User identity flow documented for xKS deployments
+  * \[P2\] Distributed tracing functional: gateway → Authorino → Limitador → payload-processing → backend (per Staff Engineer Input)
+
+  ### Dependencies
+
+  | Dependency | Type | Status | Impact if Blocked |
+  | --- | --- | --- | --- |
+  | MaaS 3.4 GA codebase | Internal | Code freeze passed (late March 2026), stable build should be available | xKS team cannot validate until stable build available -- **critical blocker** for Summit timeline |
+  | RHCL official xKS support | External | **Unknown -- needs immediate validation with OpenShift team (per Staff Engineer Input)** | If RHCL xKS support is not committed, MaaS xKS depends entirely on fallback deployment paths (standalone Authorino + Limitador or direct Envoy integration). This is a **strategic dependency** -- lack of official RHCL support undermines the long-term viability of MaaS on xKS. |
+  | Gateway API implementation on CKS | External | Confirmed available (Istio service mesh on CoreWeave) | MaaS gateway requires a functioning Gateway API implementation |
+  | Customer-provided OIDC IdP | External | Customer responsibility | User authentication depends on external OIDC provider |
+  | CKS Prometheus instance for metrics | External | Assumed available (CoreWeave standard infrastructure) | Observability metrics depend on Prometheus scraping MaaS endpoints |
+  | CKS logging infrastructure (Grafana Loki) | External | Assumed available (CoreWeave standard infrastructure) | Structured logging from Authorino/Limitador depends on log aggregation |
+
+  ### Non-Functional Requirements
+
+  * **Security**: Authentication must use external OIDC with JWT validation via Authorino (RFE). API key validation flow remains unchanged -- maas-api validates keys internally (architecture context: models-as-a-service.md).
+  * **Backwards Compatibility**: No changes to RHOAI MaaS GA -- xKS changes must be additive or configuration-driven.
+  * **Observability**: Metrics must include token usage per user/subscription, rate limiting enforcement events, API key lifecycle events (creation, validation, revocation), and inference request latency, exposed via Prometheus-compatible endpoints (Staff Engineer Input: observability is a core value proposition). Logging must include structured authentication events, rate limit enforcement (429 responses with exceeded quota), and subscription selection decisions, formatted for aggregation in CKS Grafana Loki (Staff Engineer Input). Distributed tracing (P1) must capture request flow from gateway ingress through Authorino/Limitador/payload-processing to model backend (Staff Engineer Input).
+
+  ### Out-of-Scope
+
+  * Operator-based installation on xKS (Helm only per RFE)
+  * Dashboard UI integration for xKS (explicitly excluded from Dev Preview per RFE)
+  * Production-ready deployment (Dev Preview = functional demonstration)
+  * MaaS features beyond what ships in 3.4 GA
+  * Multi-cluster MaaS federation
+
+  ### Acceptance Criteria (Proposed -- requires PM/Engineering validation)
+
+  **Happy Path Criteria:**
+
+  * Given a CKS cluster (priority platform) with RHCL/Kuadrant and Gateway API (Istio) installed, when MaaS is deployed via Helm chart with OIDC configuration, then the maas-api and maas-controller pods are running and healthy, measured by pod readiness checks passing.
+  * Given an AKS cluster with RHCL/Kuadrant and Gateway API installed, when MaaS is deployed via Helm chart with OIDC configuration, then the maas-api and maas-controller pods are running and healthy, measured by pod readiness checks passing.
+  * Given a deployed MaaS instance on CKS with OIDC configured, when a user authenticates with a valid OIDC JWT token and creates an API key, then the API key is persisted in PostgreSQL and can be used for model inference, measured by a successful inference request using the generated API key.
+  * Given a MaaSSubscription with token rate limits configured, when a user exceeds the rate limit, then Limitador returns HTTP 429, measured by monitoring the response status codes.
+  * Given an OIDC deployment with a non-standard group claim format and `groupClaimPath` configured to match that format, when a user with group membership authenticates, then the MaaSSubscription controller correctly maps the user to the appropriate subscription tier, measured by successful tier-based rate limiting enforcement.
+  * A document exists listing all known limitations of MaaS on xKS versus RHOAI MaaS GA.
+  * Given a deployed MaaS instance on CKS with Prometheus integration, when a user creates an API key, makes inference requests, and exceeds a rate limit, then Prometheus metrics include `maas_api_key_created_total`, `maas_inference_requests_total{user, model, subscription}`, and `maas_rate_limit_enforced_total{user, model, exceeded_quota}`, measured by querying the CKS Prometheus instance.
+  * Given a deployed MaaS instance on CKS with structured logging enabled, when an authentication event occurs (success or failure), then the log entry includes timestamp, user identity, authentication method (OIDC/API key), decision (allow/deny), and reason (if denied), measured by querying CKS Grafana Loki with label filters.
+  * Given a deployed MaaS instance on CKS with Perses dashboards installed, when an admin navigates to the MaaS observability dashboard, then the dashboard displays token usage per subscription, rate limiting enforcement events, and API key lifecycle metrics over the last 24 hours, measured by dashboard rendering with live data.
+
+  **Failure Mode Criteria:**
+
+  * Given a deployed MaaS instance, when the OIDC provider becomes unavailable (network partition or IdP downtime), then inference requests using valid API keys continue to succeed (API key validation is OIDC-independent), while OIDC-authenticated requests fail with HTTP 503 and a descriptive error message, measured by response status and error body.
+  * Given a MaaS deployment with Limitador pod terminated, when a user makes an inference request, then the request is denied with HTTP 503 (rate limiting enforcement unavailable), measured by response status and Envoy logs showing upstream connection failure.
+  * Given a deployed MaaS instance on xKS with cert-manager-issued TLS certificates, when the certificates are rotated (renewal before expiration), then active inference requests continue without interruption and new requests succeed with the new certificate, measured by zero connection errors during the rotation window and successful TLS handshake validation post-rotation.
+  * Given a MaaS deployment, when the PostgreSQL database becomes unavailable (network partition or pod restart), then API key creation requests fail with HTTP 503, existing API key validation requests fail (cache miss scenario), but OIDC token-based authentication continues to succeed (OIDC validation does not depend on PostgreSQL), measured by response status and error logs.
+
+  ### Effort Estimate
+
+  **Size: M** (3-5 sprints). The core MaaS codebase exists. The work is primarily around Helm chart packaging, OIDC configuration plumbing, and validation on xKS platforms. The timing risk around MaaS 3.4 GA stability could extend this. Cross-team coordination with Kuadrant and xKS platform teams adds overhead.
+
+  ### Risks
+
+  | Risk | Impact | Mitigation |
+  | --- | --- | --- |
+  | MaaS 3.4 GA timing leaves insufficient validation window | Summit demo at risk | Obtain MaaS 3.4 RC by April 27; begin CKS validation in parallel; maintain RHOAI 3.3 fallback demo |
+  | RHCL official xKS support not committed | Unsupported fallback paths undermine viability | Sprint 1: confirm RHCL commitment with OpenShift team; escalate to leadership if not committed |
+  | Kuadrant may not install on CKS | Auth/rate-limiting unavailable | Sprint 1: validate RHCL/Kuadrant on CKS; fallback to standalone Authorino + Limitador; contingency: direct Envoy ext_authz |
+  | OIDC group claim format variations | Tier mapping fails | Add configurable `groupClaimPath` to Tenant CRD |
+  | PostgreSQL unavailability | API key validation fails | Implement in-memory LRU cache (TTL: 5min) for validated API key hashes |
+  | Observability latency overhead | Performance degradation | Async metric emission; if p99 >5ms, move to post-response goroutines |
+
+  ### Assumptions
+
+  | Assumption | Validation Status | Notes |
+  | --- | --- | --- |
+  | MaaS 3.4 GA codebase is usable as a baseline for xKS Dev Preview | **Needs validation** | Timing risk per Desmond Ferraby's comment: code freeze was late March 2026, stable build delivery timing is unknown |
+  | RHCL official xKS support is available or committed | **Needs validation (critical per Staff Engineer Input)** | Sprint 1 validation task: engage OpenShift team; if not committed, escalate and activate fallback paths |
+  | Kuadrant (Authorino + Limitador) can be installed on CKS (priority platform) | **Needs validation** | Sprint 1 validation task with Istio GatewayClass; fallback paths defined if blocked |
+  | A functioning Gateway API implementation is available on CKS | **Confirmed** | CoreWeave deploys with Istio service mesh |
+  | Dev Preview scope means functional demonstration, not production-ready | **Confirmed** | RFE explicitly states this |
+  | OIDC group claim path can be made configurable without MaaS 3.4 GA code changes | **Needs validation** | If Tenant CRD is frozen, fallback: document required claim format and push IdP configuration burden to customers |
+  | CKS provides Prometheus and Grafana Loki infrastructure for observability | **Needs validation** | Sprint 1 validation task: confirm Prometheus scrape targets and Loki log aggregation are accessible for MaaS metrics/logs |
+  | Observability instrumentation in maas-api does not require MaaS 3.4 GA code changes | **Needs validation** | If maas-api is frozen, observability metrics may need to be added as a post-3.4 patch or deferred to P1 |
+
+  ### Open Questions
+
+  | Question | Owner |
+  | --- | --- |
+  | Latest date for stable MaaS 3.4 build? (Summit timeline feasibility) | MaaS PM |
+  | RHCL official xKS support commitment and timeline? (Strategic dependency) | OpenShift RHCL team |
+  | Official RHCL/Kuadrant Helm charts for CKS? | RHCL / OpenShift team |
+  | Shared vs dedicated PostgreSQL for MaaS on xKS? | xKS Platform |
+  | OIDC validation caching strategy during IdP outages? | Security / MaaS Engineering |
+  | maas-api observability instrumentation feasibility without MaaS 3.4 code changes? | MaaS Engineering |
+  | CKS Prometheus/Loki accessibility for MaaS observability? | xKS Platform / CoreWeave |
+
+  ### Supporting Documentation
+
+  * Source RFE: RHAIRFE-7336
+  * Architecture context: models-as-a-service.md (MaaS architecture, AuthPolicy, TokenRateLimitPolicy, gateway configuration)
+  * Architecture context: PLATFORM.md (MaaS component overview, Kuadrant integration)
+  * Related: RHAISTRAT-7177 -- Red Hat AI Inference Outcome
+  * Related: RHOAIENG-7277
+  * Design doc: \_To be created\_
+  * ADR: \_To be created if needed\_
+
+  ### Prerequisites & Process Gates
+
+  | Prerequisite | Status | Notes |
+  | --- | --- | --- |
+  | Architecture Review | \_Pending human review\_ | Required for TP/GA per tech review, not for DP |
+  | ODH/RHOAI Build Onboarding | \_Pending human review\_ | Helm chart build pipeline needed |
+  | Licence Validation | \_Pending human review\_ |  |
+  | Accelerator/Package Support | \_Pending human review\_ |  |
+  | Documentation Support | \_Pending human review\_ |  |
+  | UXD Support | \_Pending human review\_ | Not in scope for DP (no Dashboard) |
+  | Performance Team Support | \_Pending human review\_ |  |
+
+  ## Staff Engineer Input
+
+  <!-- HIGH-PRIORITY: Content here is used as primary guidance during strategy refinement. -->
+
+  <!-- Add technical corrections, architectural direction, component preferences, or domain expertise. -->
+
+  <!-- Write it using declarative, cumulative form; policy and statement that shall always be valid in any iteration of the STRAT Refinement -->
+
+  <!-- This input takes priority over architecture context and removed-context when they conflict. -->
+
+  <!-- After review: address findings below, then remove the needs_attention label from Jira. -->

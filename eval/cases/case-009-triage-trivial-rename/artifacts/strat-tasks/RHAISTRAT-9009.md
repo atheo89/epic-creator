@@ -1,0 +1,38 @@
+---
+strat_id: RHAISTRAT-9009
+title: Rename "Data Science Projects" navigation label to "Projects"
+status: Refinement Done
+priority: Minor
+labels:
+- refined
+links: []
+---
+
+## Problem Statement
+
+Usability testing showed the "Data Science Projects" navigation label confuses
+users who arrive from OpenShift, where the same resources are called projects.
+Product management approved shortening the label to "Projects" everywhere it
+appears in the Dashboard UI. No behavior, routing, or API changes are involved
+— this is a user-visible string change plus the corresponding documentation
+touch-ups.
+
+## High-Level Requirements
+
+| ID | Priority | Requirement |
+|-------|----------|-------------|
+| HLR-1 | P2 | The Dashboard navigation and page headings show "Projects" instead of "Data Science Projects". |
+| HLR-2 | P2 | Documentation screenshots' captions and references to the old label are updated in the affected topics. |
+
+## Affected Components
+
+- Dashboard
+
+## Out of Scope
+
+- Renaming the underlying Kubernetes resources or CRDs
+- Localization string review beyond the changed label
+
+## Open Questions
+
+None.

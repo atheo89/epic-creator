@@ -1,0 +1,31 @@
+strat_id: RHAISTRAT-9017
+tier: synthetic
+notes: |
+  Inverse triage probe — the complement of cases 003/009. The strategy looks
+  small (one main component, P1/P2 only, enumerated defects), but it must NOT
+  collapse into a single below-threshold epic: the published VPAT/accessibility
+  documentation (HLR-3) is docs-authoring work, a different work product from
+  the Dashboard code fixes, and work-product splitting mandates it be its own
+  epic (with a technical-review acceptance criterion, sequenced after the code
+  fixes it describes). Expected shape: 2-3 epics, no triage. Triaging this
+  below-threshold and bundling code+docs into one epic is the probed failure.
+
+# Canonical Jira component vocabulary shipped to this case as
+# .context/rhai-components.txt. Mirrored here because check judges only
+# receive outputs + annotations, and .context is provisioned input rather
+# than a collected output. Epic frontmatter 'component' must be one of these
+# (decompose-agent.md:61; submit.py validate_component strips anything else).
+valid_components:
+  - Dashboard
+  - Data Science Pipelines
+  - Distributed Workloads
+  - Documentation
+  - Feature Store
+  - KServe
+  - Llama Stack
+  - Model Registry
+  - Notebooks
+  - Platform Operator
+  - Serving Runtimes
+  - Training Operator
+  - TrustyAI

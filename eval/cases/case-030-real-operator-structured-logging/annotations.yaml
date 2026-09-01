@@ -1,0 +1,141 @@
+strat_id: RHAISTRAT-8010
+tier: real
+# Staff Engineer / SME Input section carries substantive technical content
+# (not template placeholder text), so the Step 1.5 override obligation
+# applies. Gates the sme_input_fidelity judge (eval.yaml `if:`).
+sme_substantive: true
+notes: "REAL strategy snapshot (tier: real) — verbatim Jira body, re-keyed and\nredacted, not authored\
+  \ for this dataset. There is NO curated ground-truth\ndecomposition for this case: the items below are\
+  \ things to CHECK in a\ndecomposition, not a single expected answer. Grade on internal consistency\n\
+  and defensibility rather than on matching a reference DAG.\n\nShape: ~23.5k characters of strategy body,\
+  \ 8 HLRs (6 P0 / 2 P1), a single\nowning component and a single owning team, plus one external team\
+  \ that only\nreceives a published convention. Effort estimate is S (1-2 sprints). The work\nis a mechanical,\
+  \ well-enumerated refactor of logging call sites spread across\ntwo binaries, several controller tiers\
+  \ and ~15 satellite source files, plus a\nconvention document and a CI lint rule. The strategy body\
+  \ also carries an\nSME-input appendix that corrects earlier, superseded scope counts.\n\nThings to watch\
+  \ for:\n\n- Triage tension. The strategy is S-sized, one component, one team, and the\n  code work is\
+  \ highly AI-implementable, which makes below-threshold tempting.\n  But two Step 0 escape conditions\
+  \ plausibly fire: a P1 documentation /\n  contribution-guideline deliverable (a different work product\
+  \ from the code\n  change) and several unresolved open questions including an audit whose\n  result\
+  \ changes the scope numbers. Either decision can be defensible, but it\n  must be stated with a rationale,\
+  \ and if triage fires the output must be\n  exactly one epic.\n- Docs work is present (publish the convention,\
+  \ contribution guideline).\n  Check whether it becomes its own docs-authoring epic sequenced after the\n\
+  \  code it describes, with a technical-review acceptance criterion, rather\n  than being folded into\
+  \ an implementation epic.\n- Investigations. The call-site audit, the unverified percentage claim, and\n\
+  \  \"which existing alerts depend on message-string patterns\" are genuine\n  unknowns. Check whether\
+  \ they surface as an investigation epic and/or\n  ambiguity flags rather than being silently resolved\
+  \ by the decomposer.\n- Over-decomposition risk. The scope enumerates many controllers, handlers\n \
+  \ and action files. One epic per file or per controller would be\n  over-fragmentation for an S-sized\
+  \ strategy; look for grouping along real\n  seams (convention definition and lint enforcement, the primary\
+  \ binary's\n  controller tiers, the secondary binary, docs) with parallel fan-out where\n  tiers are\
+  \ genuinely independent, and no invented sequencing between them.\n- Priority handling. The two P1 HLRs\
+  \ are independently deferrable\n  enhancements; if they are bundled into a P0 epic that is priority\
+  \ collapse\n  (unless the decomposition legitimately triaged the strategy, in which case\n  bundling\
+  \ is correct by design).\n- External dependency. One impacted team is outside the product's control\
+  \ and\n  its adoption is explicitly best-effort under platform policy. It should\n  appear as a dependency/risk\
+  \ or as a \"publish the convention\" deliverable\n  owned by the product team — not as an epic that\
+  \ assigns implementation work\n  to the external team, and not as a blocking prerequisite.\n- Scope\
+  \ fidelity. The SME-input appendix supersedes earlier counts and adds a\n  controller tier that the\
+  \ narrative body under-describes. A good\n  decomposition uses the corrected scope; reusing the superseded\
+  \ numbers is a\n  traceability miss.\n- All 8 HLRs must be traceable to at least one epic, including\
+  \ the\n  backwards-compatibility / log-consumer regression verification implied by\n  the NFRs and risks.\n"
+
+# Canonical Jira component vocabulary shipped to this case as
+# .context/rhai-components.txt. Mirrored here because check judges only
+# receive outputs + annotations, and .context is provisioned input rather
+# than a collected output. Epic frontmatter 'component' must be one of these
+# (decompose-agent.md:61; submit.py validate_component strips anything else).
+valid_components:
+  - AI Core Dashboard
+  - AI Core Platform
+  - AI Core Platform Security
+  - AI Evaluations
+  - AI Guardrails
+  - AI Hub
+  - AI Navigator
+  - AI Pipelines
+  - AI Platform DevOps
+  - AI Research + Community
+  - AI Safety
+  - AI Safety Orchestration
+  - AI Testing + Workflow Validation
+  - AIPCC Ecosystems
+  - AIPCC Productization
+  - Accelerator Enablement
+  - AgentDev
+  - AgentOps
+  - Agentic
+  - AutoML
+  - AutoRAG
+  - Build and Release
+  - CI/CD
+  - Compressed-Tensors
+  - Customer Exploration & Test
+  - Data Connect Hub
+  - Data Processing
+  - DevOps
+  - Distributed Workloads
+  - Documentation
+  - Feature Store
+  - Fine Tuning
+  - Gen AI Studio
+  - IBM P
+  - IBM Z
+  - INFERENG Midstream
+  - Inference Extensions
+  - Inference Gateway
+  - Inference Research
+  - Inference-Time Techniques
+  - Infra Midstream
+  - InfraOps
+  - Integrations
+  - KubeRay
+  - Kubeflow Spark Operator
+  - Kubeflow Unified SDK
+  - LLM Compressor
+  - LlamaStack
+  - MLR Speculative Decoding
+  - MLflow
+  - Model Customization
+  - Model Runtimes
+  - Model Validation
+  - Model and Agent Observability
+  - Model as a Service
+  - Monitoring
+  - Notebooks
+  - Notebooks Extensions
+  - Notebooks Images
+  - Notebooks Server
+  - OCPMCPLO
+  - OGX Core
+  - OpenShift AI Productization
+  - Optimized Models
+  - PXE
+  - PerfScale
+  - Performance Infrastructure
+  - Performance Marketing
+  - Performance Research
+  - PyTorch
+  - QE
+  - RAG
+  - RAG + Vector DB
+  - RAG_Agentic
+  - Ray Training
+  - SDG
+  - Security
+  - Serving Orchestration
+  - Speculators
+  - TestOps
+  - Tooling Experience
+  - Training Hub
+  - Training Kubeflow
+  - UXD
+  - Wheel Building
+  - Wheel Package Index
+  - Workbenches/IDE
+  - Workload Orchestration
+  - llama.cpp
+  - llm-d
+  - vLLM
+  - vLLM Runtime
+  - watsonx Orchestrate Collaboration
