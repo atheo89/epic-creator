@@ -1,0 +1,43 @@
+---
+strat_id: RHAISTRAT-9016
+title: Idle resource reporting in the web console
+status: Refinement Done
+priority: Normal
+labels:
+- refined
+links: []
+---
+
+## Problem Statement
+
+Cluster administrators cannot see which resources are sitting idle: workbenches
+nobody has touched in weeks keep their volumes and reservations, and old
+pipeline runs accumulate storage. Admins ask for a single report in the RHOAI
+web console showing idle and stale resources per project so they can reclaim
+capacity with confidence. The notebook controller already tracks last-activity
+timestamps, and Kubeflow Pipelines retains run completion metadata — the data
+exists; it is just not surfaced anywhere.
+
+## High-Level Requirements
+
+| ID | Priority | Requirement |
+|-------|----------|-------------|
+| HLR-1 | P1 | The web console shows a per-project idle-workbench report (last activity, owner, reserved resources), sourced from the notebook controller's activity tracking. |
+| HLR-2 | P1 | The web console shows a stale pipeline-run report (completed runs older than a configurable age with retained artifacts), sourced from Kubeflow Pipelines run metadata. |
+| HLR-3 | P2 | Administrators can export either report as CSV. |
+| HLR-4 | P2 | Documentation explains the reports and safe reclamation steps. |
+
+## Affected Components
+
+- RHOAI web console
+- Notebook controller
+- Kubeflow Pipelines
+
+## Out of Scope
+
+- Automated reclamation or deletion of idle resources
+- Cost/chargeback calculations
+
+## Open Questions
+
+None.

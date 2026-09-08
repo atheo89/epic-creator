@@ -1,0 +1,47 @@
+---
+strat_id: RHAISTRAT-9019
+title: Curated getting-started tutorial gallery
+status: Refinement Done
+priority: Major
+labels:
+- refined
+- onboarding
+links: []
+---
+
+## Problem Statement
+
+New users face a blank platform: the first workbench, first pipeline, and first
+model deployment all start from empty forms, and time-to-first-success is
+measured in days. We want a curated tutorial gallery in the Dashboard — a set
+of maintained, tested tutorials (notebooks and pipelines) that users can launch
+into their own project with one click. This requires product code (the gallery
+and launch mechanics), authored content (the tutorials themselves), and
+documentation — three different kinds of work with different owners and review
+processes.
+
+## High-Level Requirements
+
+| ID | Priority | Requirement |
+|-------|----------|-------------|
+| HLR-1 | P0 | The Dashboard has a tutorial gallery from which a user can launch a tutorial into their project (opening a workbench with the notebook, or importing the pipeline). |
+| HLR-2 | P0 | Six curated tutorials exist covering the core journeys: first workbench, data prep, first training run, first pipeline, first deployment, first RAG app. Each is tested against the current release. |
+| HLR-3 | P1 | A tutorial packaging format (metadata, pinned images, validation manifest) is defined so tutorials are versioned and testable independently of Dashboard releases. |
+| HLR-4 | P2 | Documentation covers using the gallery and the contribution process for new tutorials. |
+
+## Affected Components
+
+- Dashboard
+- Notebooks
+- Data Science Pipelines
+- Documentation
+
+## Out of Scope
+
+- Partner- or community-contributed tutorial intake (contribution process is
+  documented, but no submission tooling this release)
+- Localization of tutorial content
+
+## Open Questions
+
+None.

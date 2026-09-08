@@ -1,0 +1,32 @@
+strat_id: RHAISTRAT-9018
+tier: synthetic
+notes: |
+  Cross-strategy dependency probe — first case using the frontmatter links
+  field (depends-on RHAISTRAT-9990, an in-flight metering strategy that is NOT
+  part of this decomposition). Expect: external_dependency scored negative on
+  the epics consuming the metering data, and a Health Warning about the schema
+  finalizing only when RHAISTRAT-9990 lands. Two specific failure modes:
+  (a) scope fidelity — any epic that re-implements metering collection belongs
+  to the other strategy; (b) DAG validity — gated_by must reference sibling
+  epic_ids only, so the external dependency must be expressed via signals and
+  health warnings, NOT via a gated_by pointing at a nonexistent epic.
+
+# Canonical Jira component vocabulary shipped to this case as
+# .context/rhai-components.txt. Mirrored here because check judges only
+# receive outputs + annotations, and .context is provisioned input rather
+# than a collected output. Epic frontmatter 'component' must be one of these
+# (decompose-agent.md:61; submit.py validate_component strips anything else).
+valid_components:
+  - Dashboard
+  - Data Science Pipelines
+  - Distributed Workloads
+  - Documentation
+  - Feature Store
+  - KServe
+  - Llama Stack
+  - Model Registry
+  - Notebooks
+  - Platform Operator
+  - Serving Runtimes
+  - Training Operator
+  - TrustyAI

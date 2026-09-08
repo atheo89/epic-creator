@@ -1,0 +1,141 @@
+strat_id: RHAISTRAT-8001
+tier: real
+notes: "Tier: real. This is a verbatim snapshot of a real, human-signed-off RHAISTRAT\nstrategy (anonymized\
+  \ only for personal names), not an authored fixture. There\nis therefore NO curated ground-truth decomposition\
+  \ for this case: the notes\nbelow are things a grader should check, not a single expected answer.\n\n\
+  Shape:\n- ~14k characters of description, 3 High Level Requirements (all P0) plus one\n  explicitly\
+  \ deferred requirement.\n- Effort estimate: S (Small), self-described as a compliance-coordination and\n\
+  \  deadline-tracking strategy.\n- One Jira component (platform-level), but the actual blast radius is\
+  \ every\n  runtime container image in the product and essentially every component team.\n- Hard external\
+  \ deadline anchoring the acceptance criteria; two named\n  cross-strategy dependencies plus an external\
+  \ base-image delivery dependency.\n- Rich Non-Functional Requirements section including one requirement\
+  \ flagged\n  as needing domain input (no numeric performance threshold agreed).\n- Several open questions\
+  \ backed by in-flight spikes; most process gates are\n  \"pending human review\"; a design doc is listed\
+  \ as \"to be created\".\n\nThings to watch for in a decomposition:\n- Triage: the S sizing is a trap.\
+  \ Both Step 0 escape conditions look live —\n  genuine unknowns (unconfirmed base-image variants, unknown\
+  \ TLS posture of\n  some components) and multiple distinct work streams across many teams. A\n  below-threshold\
+  \ single-epic output should be treated as suspicious and\n  justified explicitly rather than inferred\
+  \ from the effort estimate alone.\n- Team/component splits: the base-image table implies natural groupings\n\
+  \  (Go operators/platform components, notebook and training runtimes,\n  Python-based services, the\
+  \ web frontend, and the JVM-based service). Check\n  that epics follow those runtime/ownership boundaries\
+  \ instead of one\n  monolithic \"switch all images\" epic or 100+ per-image epics.\n- Non-remediable\
+  \ components: a subset cannot be fixed by a base-image swap\n  because they do not use the system TLS/crypto\
+  \ stack. Check these are\n  carved out as their own work (audit/migration/exception-filing), not folded\n\
+  \  into the generic swap epic.\n- Investigations: the unconfirmed language-runtime base-image variants\
+  \ and the\n  unknown-TLS-posture component should surface as investigation/spike epics\n  that gate\
+  \ the dependent implementation epics, with sensible edges in the DAG.\n- Coordination vs engineering:\
+  \ much of the described effort is aggregation and\n  deadline chasing. Check whether the decomposer\
+  \ produces a pure\n  project-management epic (usually undesirable) or attaches the tracking work\n \
+  \ to concrete verification deliverables.\n- Verification: one acceptance criterion is an automated CI\
+  \ scan across the\n  release payload. Check whether that becomes a real epic with an owner rather\n\
+  \  than being assumed as a side effect of the image switches.\n- Scope discipline: a sizeable Out-of-Scope\
+  \ list (deferred signature work,\n  items owned by a sibling strategy, post-release image evolution,\
+  \ and the\n  per-team exception filings themselves). Epics that re-import any of these\n  are scope\
+  \ leaks. The sibling-strategy dependency should appear as an\n  external dependency, not as an epic\
+  \ owned here.\n- Docs: a per-component readiness matrix is listed as to-be-created and the\n  documentation\
+  \ gate is unresolved — check whether a docs-authoring epic\n  appears, and whether its priority is derived\
+  \ from the strategy priority\n  rather than inherited from what it documents.\n- Priority inheritance:\
+  \ all in-scope requirements are P0 and share one\n  deadline, so a decomposition with mixed priorities\
+  \ needs a good reason; the\n  deferred requirement must not silently become an epic.\n- Unresolved NFR:\
+  \ the missing performance regression threshold is an open\n  ambiguity and should show up as an ambiguity\
+  \ flag or an investigation, not\n  as an invented numeric target.\n"
+
+# Canonical Jira component vocabulary shipped to this case as
+# .context/rhai-components.txt. Mirrored here because check judges only
+# receive outputs + annotations, and .context is provisioned input rather
+# than a collected output. Epic frontmatter 'component' must be one of these
+# (decompose-agent.md:61; submit.py validate_component strips anything else).
+valid_components:
+  - AI Core Dashboard
+  - AI Core Platform
+  - AI Core Platform Security
+  - AI Evaluations
+  - AI Guardrails
+  - AI Hub
+  - AI Navigator
+  - AI Pipelines
+  - AI Platform DevOps
+  - AI Research + Community
+  - AI Safety
+  - AI Safety Orchestration
+  - AI Testing + Workflow Validation
+  - AIPCC Ecosystems
+  - AIPCC Productization
+  - Accelerator Enablement
+  - AgentDev
+  - AgentOps
+  - Agentic
+  - AutoML
+  - AutoRAG
+  - Build and Release
+  - CI/CD
+  - Compressed-Tensors
+  - Customer Exploration & Test
+  - Data Connect Hub
+  - Data Processing
+  - DevOps
+  - Distributed Workloads
+  - Documentation
+  - Feature Store
+  - Fine Tuning
+  - Gen AI Studio
+  - IBM P
+  - IBM Z
+  - INFERENG Midstream
+  - Inference Extensions
+  - Inference Gateway
+  - Inference Research
+  - Inference-Time Techniques
+  - Infra Midstream
+  - InfraOps
+  - Integrations
+  - KubeRay
+  - Kubeflow Spark Operator
+  - Kubeflow Unified SDK
+  - LLM Compressor
+  - LlamaStack
+  - MLR Speculative Decoding
+  - MLflow
+  - Model Customization
+  - Model Runtimes
+  - Model Validation
+  - Model and Agent Observability
+  - Model as a Service
+  - Monitoring
+  - Notebooks
+  - Notebooks Extensions
+  - Notebooks Images
+  - Notebooks Server
+  - OCPMCPLO
+  - OGX Core
+  - OpenShift AI Productization
+  - Optimized Models
+  - PXE
+  - PerfScale
+  - Performance Infrastructure
+  - Performance Marketing
+  - Performance Research
+  - PyTorch
+  - QE
+  - RAG
+  - RAG + Vector DB
+  - RAG_Agentic
+  - Ray Training
+  - SDG
+  - Security
+  - Serving Orchestration
+  - Speculators
+  - TestOps
+  - Tooling Experience
+  - Training Hub
+  - Training Kubeflow
+  - UXD
+  - Wheel Building
+  - Wheel Package Index
+  - Workbenches/IDE
+  - Workload Orchestration
+  - llama.cpp
+  - llm-d
+  - vLLM
+  - vLLM Runtime
+  - watsonx Orchestrate Collaboration

@@ -41,6 +41,10 @@ def fetch_components(server, user, token):
 
 
 def main():
+    if os.environ.get("EPIC_SKIP_BOOTSTRAP"):
+        print("EPIC_SKIP_BOOTSTRAP set - skipping dependency bootstrapping step")
+        return
+
     server, user, token = require_env()
     if not all([server, user, token]):
         print("Error: JIRA_SERVER, JIRA_USER, and JIRA_TOKEN env vars "

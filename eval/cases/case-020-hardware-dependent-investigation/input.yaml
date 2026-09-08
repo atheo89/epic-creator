@@ -1,0 +1,40 @@
+strat_id: RHAISTRAT-9020
+strategy_title: AMD GPU (ROCm) enablement for serving and training
+strategy_markdown: |
+  ## Problem Statement
+
+  Two strategic customers are standardizing on AMD Instinct accelerators and need
+  RHOAI to serve and train on ROCm. Upstream vLLM and PyTorch both publish ROCm
+  support, but the platform ships only CUDA runtime builds, and we have no
+  first-hand data on functional or performance parity for our supported model
+  set. Feature and performance validation requires physical AMD GPU hardware —
+  none exists in our CI fleet today — and upstream ROCm image cadence is
+  controlled by AMD and the upstream communities.
+
+  ## High-Level Requirements
+
+  | ID | Priority | Requirement |
+  |-------|----------|-------------|
+  | HLR-1 | P0 | A validation campaign on physical AMD Instinct hardware establishes functional and performance parity data for vLLM serving of the supported model set, producing the go/no-go scope for productization. |
+  | HLR-2 | P0 | A supported vLLM ROCm serving runtime is productized for the models the validation campaign clears. |
+  | HLR-3 | P1 | PyTorch training on ROCm is supported for single- and multi-GPU jobs admitted through Kueue, with amd.com/gpu quota handling. |
+  | HLR-4 | P2 | Documentation states supported AMD hardware, driver prerequisites, and the validated model list. |
+
+  ## Affected Components
+
+  - KServe
+  - Serving Runtimes
+  - Training Operator
+  - Distributed Workloads
+
+  ## Out of Scope
+
+  - Intel Gaudi or other non-AMD accelerator families
+  - AMD GPU sharing/partitioning support
+
+  ## Open Questions
+
+  1. Hardware access: the validation campaign (HLR-1) needs dedicated AMD
+     Instinct nodes — procurement or partner-lab access is unresolved.
+  2. Upstream ROCm build cadence: whether AMD's runtime image releases align
+     with our release trains is outside our control.

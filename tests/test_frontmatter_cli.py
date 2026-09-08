@@ -357,3 +357,38 @@ class TestSetUpdate:
         read_out, _, _ = run_fm("read", path)
         data = json.loads(read_out)
         assert data["revised"] is False
+
+
+class TestCoerceNullAndFallbacks:
+    """Regression coverage for the 2026-08-19 eval-run findings: null on
+    dict/int fields crashed (one revise agent edited this script mid-run to
+    proceed), and unquoted list syntax raised a raw traceback."""
+
+    def test_null_clears_dict_field(self):
+        from frontmatter import _coerce_value
+        assert _coerce_value("null", {"type": "dict"}) is None
+
+    def test_null_clears_int_field(self):
+        from frontmatter import _coerce_value
+        assert _coerce_value("null", {"type": "int"}) is None
+
+    def test_dict_accepts_json_object(self):
+        from frontmatter import _coerce_value
+        assert _coerce_value('{"action": "rewrite"}', {"type": "dict"}) == {
+            "action": "rewrite"}
+
+    def test_dict_rejects_non_object_with_clear_message(self):
+        from frontmatter import _coerce_value
+        with pytest.raises(ValueError, match="dict"):
+            _coerce_value("notjson", {"type": "dict"})
+
+    def test_unquoted_bracket_list_falls_back_to_comma_split(self):
+        from frontmatter import _coerce_value
+        got = _coerce_value("[RHAISTRAT-9013-E001,RHAISTRAT-9013-E002]",
+                            {"type": "list"})
+        assert got == ["RHAISTRAT-9013-E001", "RHAISTRAT-9013-E002"]
+
+    def test_int_error_mentions_null_escape(self):
+        from frontmatter import _coerce_value
+        with pytest.raises(ValueError, match="null"):
+            _coerce_value("abc", {"type": "int"})

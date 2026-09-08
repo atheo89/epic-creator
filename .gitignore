@@ -4,3 +4,16 @@ tmp/
 __pycache__/
 *.pyc
 .env
+eval/runs/
+eval/.raw/
+eval/.entity-map.yaml
+.context.synthetic-backup/
+
+# The `artifacts/` and `.context/` rules above match at any depth, which would
+# silently drop each eval case's strategy file and architecture context — i.e.
+# the dataset itself. Re-include them (directory AND contents; git cannot
+# re-include through an excluded parent).
+!eval/cases/*/artifacts/
+!eval/cases/*/artifacts/**
+!eval/cases/*/.context/
+!eval/cases/*/.context/**

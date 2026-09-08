@@ -138,8 +138,14 @@ def compute_for_epic(epic_path):
 
 def compute_for_strategy(strat_id):
     """Compute scores for all epics of a strategy. Returns count of epics processed."""
-    pattern = f"artifacts/epic-tasks/{strat_id}-E*.md"
-    epic_files = sorted(glob.glob(pattern))
+    # Two explicit patterns: conditional decompositions name their epics
+    # {strat_id}-BRANCH-<X>-E00N.md, which {strat_id}-E*.md cannot match — the
+    # 2026-08-19 eval's case-007 shipped 7 of 8 epics unscored because of it.
+    # (Not {strat_id}*-E*.md: that would cross-match longer strategy ids
+    # sharing the prefix.)
+    epic_files = sorted(
+        glob.glob(f"artifacts/epic-tasks/{strat_id}-E*.md")
+        + glob.glob(f"artifacts/epic-tasks/{strat_id}-BRANCH-*-E*.md"))
 
     if not epic_files:
         print(f"  {strat_id}: no epic files found", file=sys.stderr)

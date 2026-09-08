@@ -1,0 +1,46 @@
+strat_id: RHAISTRAT-9003
+tier: synthetic
+notes: |
+  Looks-trivial probe: the strategy reads like a below-threshold candidate (a
+  shipped-default change plus a release note) but must NOT collapse to a single
+  epic, and this case exists to check that the pipeline resists that pull.
+
+  Why below-threshold is NOT the expected answer here (decompose-agent.md
+  Step 0):
+  - :15 requires "a single component AND a single team" for below-threshold.
+    This strategy names TWO Affected Components (Notebooks, Dashboard), so the
+    precondition is not met.
+  - HLR-2 (release note plus cluster-settings documentation) trips the :19
+    escape condition — "code implementation + content authoring +
+    documentation" are distinct work streams, which forces decomposition even
+    at trivial size.
+
+  So `expected_triage` is deliberately absent: a decomposition WITHOUT triage is
+  correct, and the 2-epic output observed in the 2026-08-17 run is
+  prompt-permitted rather than over-decomposition. What a grader should still
+  check is boundary quality, not epic count: the code change and the
+  content/docs work belong in separate epics, the docs-authoring epic comes
+  last, and the epic set does not inflate a trivial change into more work than
+  the strategy states. Anything beyond ~3 epics IS over-decomposition here.
+  (Caveat for skill owners: :19 has no triviality qualifier, which is what makes
+  a below-threshold reading arguable at all — tracked upstream.)
+
+# Canonical Jira component vocabulary shipped to this case as
+# .context/rhai-components.txt. Mirrored here because check judges only
+# receive outputs + annotations, and .context is provisioned input rather
+# than a collected output. Epic frontmatter 'component' must be one of these
+# (decompose-agent.md:61; submit.py validate_component strips anything else).
+valid_components:
+  - Dashboard
+  - Data Science Pipelines
+  - Distributed Workloads
+  - Documentation
+  - Feature Store
+  - KServe
+  - Llama Stack
+  - Model Registry
+  - Notebooks
+  - Platform Operator
+  - Serving Runtimes
+  - Training Operator
+  - TrustyAI

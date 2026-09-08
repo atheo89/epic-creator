@@ -1,0 +1,37 @@
+strat_id: RHAISTRAT-9001
+strategy_title: Surface model deployment status in the RHOAI Dashboard
+strategy_markdown: |
+  ## Problem Statement
+
+  Data scientists deploying models through the Dashboard cannot tell whether a
+  deployment is healthy without leaving the console. InferenceService state is
+  only visible via `oc get inferenceservice` or by reading Kubernetes events,
+  which most Dashboard users cannot access. Support cases regularly begin with
+  "my model has been Pending for an hour" — information the platform already has
+  but does not surface.
+
+  ## High-Level Requirements
+
+  | ID | Priority | Requirement |
+  |-------|----------|-------------|
+  | HLR-1 | P0 | Users see a deployment status (Ready, Progressing, Failed) for each deployed model in the Dashboard model serving views. |
+  | HLR-2 | P0 | Users can open a status detail view showing the underlying condition messages and recent events for a failed or progressing deployment. |
+  | HLR-3 | P1 | Displayed status reflects the actual InferenceService state within 30 seconds of a change, without a manual page reload. |
+  | HLR-4 | P2 | Users can filter and sort the deployed models list by status. |
+  | HLR-5 | P2 | Product documentation explains each status value and the first troubleshooting steps for Failed deployments. |
+
+  ## Affected Components
+
+  - Dashboard
+  - KServe
+
+  ## Out of Scope
+
+  - Alerting or notifications on status transitions
+  - Status history / timeline views
+  - ModelMesh deployments (KServe InferenceService only)
+
+  ## Open Questions
+
+  None blocking — KServe already exposes the needed conditions on the
+  InferenceService status; this strategy is about surfacing them.

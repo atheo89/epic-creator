@@ -1,0 +1,46 @@
+---
+strat_id: RHAISTRAT-9018
+title: GPU chargeback reporting for platform administrators
+status: Refinement Done
+priority: Major
+labels:
+- refined
+- observability
+links:
+- 'depends-on: RHAISTRAT-9990 (GPU usage metering — in flight, separate strategy)'
+---
+
+## Problem Statement
+
+Platform teams fund shared GPU clusters but cannot attribute consumption to the
+projects using them, so capacity costs are socialized and heavy users have no
+incentive to release resources. The in-flight metering strategy
+(RHAISTRAT-9990) is delivering per-project GPU-hour usage data; this strategy
+builds the administrator-facing chargeback reporting on top of that data. The
+metering data schema is owned by RHAISTRAT-9990 and is not final until that
+strategy lands — reporting work here consumes it, and must not re-implement
+collection.
+
+## High-Level Requirements
+
+| ID | Priority | Requirement |
+|-------|----------|-------------|
+| HLR-1 | P0 | Administrators can view per-project GPU-hour consumption reports over selectable time ranges, computed from the metering data delivered by RHAISTRAT-9990. |
+| HLR-2 | P1 | Reports can be exported as CSV and retrieved via a stable API for finance tooling. |
+| HLR-3 | P1 | The Dashboard admin view shows current-month consumption against each project's Kueue quota. |
+| HLR-4 | P2 | Documentation covers report semantics (what counts as a GPU-hour) and export integration. |
+
+## Affected Components
+
+- Dashboard
+- Distributed Workloads
+
+## Out of Scope
+
+- The metering collection pipeline itself (RHAISTRAT-9990)
+- Currency/cost-rate modelling — reports are in GPU-hours, not dollars
+
+## Open Questions
+
+1. The metering data schema finalizes only when RHAISTRAT-9990 lands; report
+   implementation consuming it carries that external timing risk.

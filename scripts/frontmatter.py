@@ -49,6 +49,14 @@ def _coerce_value(value_str, field_spec):
     """Coerce a CLI string value to the correct type based on field spec."""
     field_type = field_spec.get("type", "string")
 
+    # null/none clears a field regardless of its type. Previously only string
+    # and list accepted it: `gated_by=null` on a dict field reached the schema
+    # as the string "null" ("expected dict, got str") and int fields crashed
+    # in int() — both hit by revise agents in the 2026-08-19 eval run, one of
+    # which resorted to editing this script mid-run to proceed.
+    if value_str.lower() in ("null", "none"):
+        return None
+
     if field_type == "bool":
         if value_str.lower() in ("true", "1", "yes"):
             return True
@@ -57,22 +65,41 @@ def _coerce_value(value_str, field_spec):
         raise ValueError(f"Cannot convert '{value_str}' to bool")
 
     if field_type == "int":
-        return int(value_str)
+        try:
+            return int(value_str)
+        except ValueError:
+            raise ValueError(
+                f"Cannot convert '{value_str}' to int (use 'null' to clear)")
 
     if field_type == "list":
         if value_str.startswith("["):
             import json
             try:
                 return json.loads(value_str)
-            except json.JSONDecodeError as e:
-                raise ValueError(f"Invalid JSON for list field: {e}")
-        if value_str.lower() in ("null", "none"):
-            return None
+            except json.JSONDecodeError:
+                # Agents commonly write [A-1,B-2] without quotes, which is not
+                # JSON. Fall back to comma-splitting the bracket contents
+                # instead of failing the whole set command.
+                inner = value_str.strip()[1:-1] if value_str.strip().endswith("]") \
+                    else value_str.strip()[1:]
+                return [v.strip().strip("'\"") for v in inner.split(",") if v.strip()]
         return [v.strip() for v in value_str.split(",") if v.strip()]
 
+    if field_type == "dict":
+        import json
+        try:
+            parsed = json.loads(value_str)
+        except json.JSONDecodeError:
+            raise ValueError(
+                f"Cannot convert '{value_str}' to dict: pass a JSON object "
+                f"(e.g. '{{\"action\": \"rewrite\"}}'), 'null' to clear, or set "
+                f"nested fields individually with parent.child=value")
+        if not isinstance(parsed, dict):
+            raise ValueError(f"Expected a JSON object for dict field, got "
+                             f"{type(parsed).__name__}")
+        return parsed
+
     if field_type == "string":
-        if value_str.lower() == "null" or value_str.lower() == "none":
-            return None
         return value_str
 
     return value_str

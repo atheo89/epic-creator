@@ -60,23 +60,31 @@ def check_id(phase, strat_id):
             return "pending"
         return "completed"
     if phase == "review_decomp":
+        # The review agent writes the body first and sets frontmatter via
+        # frontmatter.py seconds later. A file that exists without parseable
+        # frontmatter is mid-write, not failed — same reasoning as the
+        # decompose branch above. Returning "error" here released the
+        # wait-for-wave barrier early (ERRORS=1, pending=0 -> NEXT_POLL=0) in
+        # three cases of the 2026-08-19 eval run, letting the dispatcher
+        # advance phases while the reviewer was still writing.
         try:
             data, _ = read_frontmatter(path)
         except Exception:
-            return "error"
+            return "pending"
         if not data:
-            return "error"
+            return "pending"
         if data.get("score") is None:
             return "pending"
         if data.get("error"):
             return "error"
     if phase == "revise_decomp":
+        # Same body-then-frontmatter write pattern as the review agent.
         try:
             data, _ = read_frontmatter(path)
         except Exception:
-            return "error"
+            return "pending"
         if not data:
-            return "error"
+            return "pending"
         # revised can be true (changes made) or false (no changes needed).
         # Either value means the agent finished. Only absent/None = pending.
         if data.get("revised") is not None:

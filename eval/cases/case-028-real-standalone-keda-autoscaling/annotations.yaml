@@ -1,0 +1,134 @@
+strat_id: RHAISTRAT-8008
+tier: real
+notes: "REAL strategy snapshot (tier: real) — anonymized verbatim body, not authored\nfor this eval. There\
+  \ is therefore NO curated ground-truth decomposition for\nthis case: the items below are things a grader\
+  \ should CHECK in whatever DAG\nthe skill produces, not a single expected answer.\n\nShape: ~19k characters\
+  \ of description, 7 High Level Requirements (5 P0,\n2 P1), effort estimate M (Medium, 2-3 sprints),\
+  \ Critical priority, status\nRefinement. Three affected components spanning two owning teams: a serving\n\
+  control-plane controller (API types + CEL validation + reconciler\nbranching + status conditions), a\
+  \ downstream platform controller adding a\nparallel authentication-context reconciler, and Documentation.\
+  \ Five declared\ndependencies (two external operators that the platform explicitly does not\nauto-install,\
+  \ one internal metrics source, one in-progress upstream PR, one\nexisting internal reference implementation),\
+  \ five risks, five assumptions\n(three explicitly \"needs validation\"), three open questions, and seven\n\
+  process gates all marked pending human review.\n\nThings to watch for in a decomposition:\n- Team/repo\
+  \ split: the two code components live in different repositories\n  with different owners even though\
+  \ the summary lists a single team; epics\n  that fuse them lose the coordination boundary, while over-splitting\
+  \ the\n  API/validation/controller changes inside one repo into three epics is\n  likely over-decomposition\
+  \ for an M-sized strategy.\n- Work-product type split: the documentation HLR (decision guide,\n  per-workload\
+  \ configuration recipes, troubleshooting, supported\n  configuration matrix) is substantial and should\
+  \ be its own docs epic, not\n  a checklist item inside a code epic.\n- Investigations: the three open\
+  \ questions are genuinely open (a performance\n  target owned by another team, capacity guidance for\
+  \ fleet-scale metric\n  polling owned by a performance team, and the scope of downstream\n  adaptation\
+  \ needed beyond the authentication context) and the \"needs\n  validation\" assumptions imply spikes;\
+  \ check whether they become\n  investigation epics with real exit criteria rather than being silently\n\
+  \  resolved by the decomposer inventing an answer.\n- External dependency sequencing: one code epic\
+  \ depends on an upstream pull\n  request that has not merged. The strategy states a downstream-carry\n\
+  \  fallback, so a decomposition that hard-blocks everything on the upstream\n  merge, or one that ignores\
+  \ the dependency entirely, are both wrong; look\n  for the conditional/mitigated form.\n- Two mutually\
+  \ exclusive configuration paths through one API mean validation\n  and negative-path acceptance criteria\
+  \ matter — check that the mutual\n  exclusivity / rejection behaviour and the backwards-compatibility\
+  \ NFR\n  (existing configurations must be unaffected) are traceable to some epic.\n- Cross-strategy\
+  \ dependencies: several related strategies are referenced for\n  cold-start/model-loading work that\
+  \ is explicitly out of scope here; those\n  should appear as external references, not as epics in this\
+  \ DAG.\n- Traceability: all 7 HLRs should map to at least one epic, with the two P1\n  items (scaling\
+  \ observability, well-lit-path documentation) not dropped.\n"
+
+# Canonical Jira component vocabulary shipped to this case as
+# .context/rhai-components.txt. Mirrored here because check judges only
+# receive outputs + annotations, and .context is provisioned input rather
+# than a collected output. Epic frontmatter 'component' must be one of these
+# (decompose-agent.md:61; submit.py validate_component strips anything else).
+valid_components:
+  - AI Core Dashboard
+  - AI Core Platform
+  - AI Core Platform Security
+  - AI Evaluations
+  - AI Guardrails
+  - AI Hub
+  - AI Navigator
+  - AI Pipelines
+  - AI Platform DevOps
+  - AI Research + Community
+  - AI Safety
+  - AI Safety Orchestration
+  - AI Testing + Workflow Validation
+  - AIPCC Ecosystems
+  - AIPCC Productization
+  - Accelerator Enablement
+  - AgentDev
+  - AgentOps
+  - Agentic
+  - AutoML
+  - AutoRAG
+  - Build and Release
+  - CI/CD
+  - Compressed-Tensors
+  - Customer Exploration & Test
+  - Data Connect Hub
+  - Data Processing
+  - DevOps
+  - Distributed Workloads
+  - Documentation
+  - Feature Store
+  - Fine Tuning
+  - Gen AI Studio
+  - IBM P
+  - IBM Z
+  - INFERENG Midstream
+  - Inference Extensions
+  - Inference Gateway
+  - Inference Research
+  - Inference-Time Techniques
+  - Infra Midstream
+  - InfraOps
+  - Integrations
+  - KubeRay
+  - Kubeflow Spark Operator
+  - Kubeflow Unified SDK
+  - LLM Compressor
+  - LlamaStack
+  - MLR Speculative Decoding
+  - MLflow
+  - Model Customization
+  - Model Runtimes
+  - Model Validation
+  - Model and Agent Observability
+  - Model as a Service
+  - Monitoring
+  - Notebooks
+  - Notebooks Extensions
+  - Notebooks Images
+  - Notebooks Server
+  - OCPMCPLO
+  - OGX Core
+  - OpenShift AI Productization
+  - Optimized Models
+  - PXE
+  - PerfScale
+  - Performance Infrastructure
+  - Performance Marketing
+  - Performance Research
+  - PyTorch
+  - QE
+  - RAG
+  - RAG + Vector DB
+  - RAG_Agentic
+  - Ray Training
+  - SDG
+  - Security
+  - Serving Orchestration
+  - Speculators
+  - TestOps
+  - Tooling Experience
+  - Training Hub
+  - Training Kubeflow
+  - UXD
+  - Wheel Building
+  - Wheel Package Index
+  - Workbenches/IDE
+  - Workload Orchestration
+  - llama.cpp
+  - llm-d
+  - vLLM
+  - vLLM Runtime
+  - watsonx Orchestrate Collaboration

@@ -1,0 +1,138 @@
+strat_id: RHAISTRAT-8003
+tier: real
+notes: "REAL strategy snapshot (tier: real) — anonymized verbatim from a refined\nRHAISTRAT, not authored\
+  \ for this eval. There is NO curated ground-truth\ndecomposition for this case: the items below are\
+  \ things a grader should\ncheck, not a single expected answer. Different reasonable decompositions\n\
+  should be accepted as long as they satisfy these properties.\n\nShape: ~27.5k characters of description;\
+  \ 13 High Level Requirements\n(8 x P0, 3 x P1, 2 x P2); effort estimate \"Size: M\" (3-5 sprints);\n\
+  6 rows in the affected-components table spanning 3 impacted teams (the\nowning service team, a platform/installation\
+  \ team, and an external\ncomponent team outside this organization's control). Technology surface:\n\
+  a multi-component service (operator + REST API + Envoy external processor),\npolicy-based auth and rate\
+  \ limiting, Gateway API, Helm packaging as a\nreplacement for operator/OLM install, external OIDC identity,\
+  \ PostgreSQL,\nand an observability stack (metrics, structured logging, distributed\ntracing). The strategy\
+  \ also carries 8 assumptions, most marked \"needs\nvalidation\", 7 open questions with named owner teams,\
+  \ and a schedule risk\ntied to an upstream release train.\n\nThings to watch for in a decomposition:\n\
+  - Investigation vs implementation: several P0 items are validation /\n  confirmation activities (\"\
+  confirm external component support\", \"validate\n  on platform X\", \"deploy and document what breaks\"\
+  ) rather than coding.\n  A good decomposition should surface investigation/spike epics for the\n  unvalidated\
+  \ assumptions and gate the dependent implementation epics on\n  them, instead of asserting implementation\
+  \ scope that the strategy says\n  is not yet known.\n- External-team dependency: the critical dependency\
+  \ is owned by a team\n  outside the strategy's component set and is explicitly unknown. Check\n  that\
+  \ this appears as a dependency / gating investigation rather than as\n  an epic this team would implement,\
+  \ and that the documented fallback and\n  contingency deployment paths are modelled as a conditional\
+  \ branch, not\n  as three parallel epics all of which get built.\n- Two target platforms: the strategy\
+  \ names a priority platform and a\n  second required platform. Check whether validation work is split\
+  \ per\n  platform with the priority one first (sequenced), or collapsed/duplicated\n  without justification.\n\
+  - Priority inheritance: P0/P1/P2 markers on the HLRs, including the tiered\n  observability work (metrics\
+  \ P0, logging P1, tracing P2), should be\n  reflected in epic priorities; tracing should not be promoted\
+  \ to the\n  critical path.\n- Docs work is genuinely present: at least two HLRs are documentation\n\
+  \  deliverables (known-limitations inventory, identity-flow documentation)\n  plus dashboard/runbook-style\
+  \ observability artifacts. Check that\n  docs-authoring work is separated per the docs-authoring policy\
+  \ rather\n  than being buried inside engineering epics.\n- Packaging vs configuration: the strategy\
+  \ distinguishes configuration-only\n  changes (external component, policy CRs) from real code/packaging\
+  \ work\n  (Helm charts, configurable claim mapping, metrics instrumentation). Epics\n  that create engineering\
+  \ work for the configuration-only rows are inflating\n  scope.\n- Out-of-scope discipline: operator-based\
+  \ install, dashboard/UI integration,\n  production hardening, multi-cluster federation, and features\
+  \ beyond the\n  baseline release are explicitly excluded. Any epic covering them is a\n  scope leak.\n\
+  - Process gates: the prerequisites table is entirely \"pending human review\",\n  so gate-related items\
+  \ should be flagged as human process gates rather\n  than turned into engineering epics.\n"
+
+# Canonical Jira component vocabulary shipped to this case as
+# .context/rhai-components.txt. Mirrored here because check judges only
+# receive outputs + annotations, and .context is provisioned input rather
+# than a collected output. Epic frontmatter 'component' must be one of these
+# (decompose-agent.md:61; submit.py validate_component strips anything else).
+valid_components:
+  - AI Core Dashboard
+  - AI Core Platform
+  - AI Core Platform Security
+  - AI Evaluations
+  - AI Guardrails
+  - AI Hub
+  - AI Navigator
+  - AI Pipelines
+  - AI Platform DevOps
+  - AI Research + Community
+  - AI Safety
+  - AI Safety Orchestration
+  - AI Testing + Workflow Validation
+  - AIPCC Ecosystems
+  - AIPCC Productization
+  - Accelerator Enablement
+  - AgentDev
+  - AgentOps
+  - Agentic
+  - AutoML
+  - AutoRAG
+  - Build and Release
+  - CI/CD
+  - Compressed-Tensors
+  - Customer Exploration & Test
+  - Data Connect Hub
+  - Data Processing
+  - DevOps
+  - Distributed Workloads
+  - Documentation
+  - Feature Store
+  - Fine Tuning
+  - Gen AI Studio
+  - IBM P
+  - IBM Z
+  - INFERENG Midstream
+  - Inference Extensions
+  - Inference Gateway
+  - Inference Research
+  - Inference-Time Techniques
+  - Infra Midstream
+  - InfraOps
+  - Integrations
+  - KubeRay
+  - Kubeflow Spark Operator
+  - Kubeflow Unified SDK
+  - LLM Compressor
+  - LlamaStack
+  - MLR Speculative Decoding
+  - MLflow
+  - Model Customization
+  - Model Runtimes
+  - Model Validation
+  - Model and Agent Observability
+  - Model as a Service
+  - Monitoring
+  - Notebooks
+  - Notebooks Extensions
+  - Notebooks Images
+  - Notebooks Server
+  - OCPMCPLO
+  - OGX Core
+  - OpenShift AI Productization
+  - Optimized Models
+  - PXE
+  - PerfScale
+  - Performance Infrastructure
+  - Performance Marketing
+  - Performance Research
+  - PyTorch
+  - QE
+  - RAG
+  - RAG + Vector DB
+  - RAG_Agentic
+  - Ray Training
+  - SDG
+  - Security
+  - Serving Orchestration
+  - Speculators
+  - TestOps
+  - Tooling Experience
+  - Training Hub
+  - Training Kubeflow
+  - UXD
+  - Wheel Building
+  - Wheel Package Index
+  - Workbenches/IDE
+  - Workload Orchestration
+  - llama.cpp
+  - llm-d
+  - vLLM
+  - vLLM Runtime
+  - watsonx Orchestrate Collaboration

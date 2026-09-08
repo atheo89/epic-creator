@@ -1,0 +1,34 @@
+strat_id: RHAISTRAT-9008
+tier: synthetic
+notes: |
+  Deliberately underspecified and partially contradictory strategy: three of
+  four HLRs have no priority and no measurable outcome, HLR-1 contains a
+  direct contradiction, and open questions dominate. A strong decomposition
+  does NOT invent clarity: expect Investigation epics for the unanswered
+  questions (or a defensible triage/health-warning outcome), honest Health
+  Warnings in the summary, and no Implementation epics that fabricate specific
+  integrations, tools, or "simplification" designs the strategy never named.
+  A confident multi-epic implementation plan here is a scope-fidelity failure.
+  The internal review legitimately may score low or require revise cycles; a
+  final pass=false is an acceptable pipeline outcome (reported as failed, not
+  error) — artifact files must still exist and be schema-valid.
+
+# Canonical Jira component vocabulary shipped to this case as
+# .context/rhai-components.txt. Mirrored here because check judges only
+# receive outputs + annotations, and .context is provisioned input rather
+# than a collected output. Epic frontmatter 'component' must be one of these
+# (decompose-agent.md:61; submit.py validate_component strips anything else).
+valid_components:
+  - Dashboard
+  - Data Science Pipelines
+  - Distributed Workloads
+  - Documentation
+  - Feature Store
+  - KServe
+  - Llama Stack
+  - Model Registry
+  - Notebooks
+  - Platform Operator
+  - Serving Runtimes
+  - Training Operator
+  - TrustyAI

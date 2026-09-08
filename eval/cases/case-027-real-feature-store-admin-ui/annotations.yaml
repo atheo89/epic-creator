@@ -1,0 +1,141 @@
+strat_id: RHAISTRAT-8007
+tier: real
+notes: "REAL strategy snapshot (tier: real) — verbatim body from a production\nRHAISTRAT, anonymized only.\
+  \ There is NO curated ground-truth decomposition\nfor this case: do not grade against a single expected\
+  \ DAG. The notes below\nare things to CHECK in whatever decomposition the pipeline produces.\n\nShape:\
+  \ ~29k-character refined strategy, 8 High Level Requirements\n(5 x P0, 2 x P1, 1 x P2), effort estimate\
+  \ M (Medium, 3-5 sprints),\nTechnology Preview scope. Essentially a single-component feature: an admin\n\
+  CRUD/lifecycle UI in the dashboard over an existing operator CRD. The\naffected-components table lists\
+  \ dashboard frontend, dashboard backend\n(RBAC manifest only), dashboard kustomize manifests, and the\
+  \ feature-store\noperator with \"no code changes expected\". Impacted teams named in the body:\ndashboard/frontend\
+  \ engineering (primary), feature-store engineering\n(consultants), UXD, QE, docs.\n\nThings a grader\
+  \ should watch for:\n\n- Granularity. One dominant implementing team and one dominant component,\n \
+  \ but five P0 HLRs covering distinct UI surfaces (guided creation form,\n  management list page, read-only\
+  \ detail view, delete flow, live status\n  reporting). Both failure directions are plausible here: a\
+  \ single\n  \"build the admin UI\" mega-epic that swallows all 8 HLRs, and a\n  mechanical one-epic-per-HLR\
+  \ fan-out that manufactures 8 epics for an\n  M-sized single-component feature. Check that the split\
+  \ has a stated\n  rationale (deliverable slices / review boundaries), not just HLR echo.\n\n- Work-product\
+  \ split. Docs is a real, separately-owned deliverable here\n  (admin-guide content, including the air-gapped\
+  \ path) and must land as\n  its own docs-authoring epic rather than being appended to a code epic.\n\
+  \  Same for design work: the strategy is explicitly blocked on UXD\n  wireframes, so check whether design\
+  \ is modelled as a dependency /\n  process gate rather than as an engineering epic the platform team\
+  \ can\n  just implement.\n\n- Investigations vs features. Six open questions and several\n  \"needs\
+  \ validation\" assumptions imply spike/decision work: how much of\n  the CRD spec to expose in the form\
+  \ for TP, whether in-place edit is even\n  possible given field mutability, which backend combinations\
+  \ to restrict,\n  and how far the existing prototype aligns with the formal path. Check\n  that these\
+  \ appear as bounded investigations feeding the form-wizard\n  epic, and not as vague \"TBD\" epics or,\
+  \ worse, as silently resolved\n  assumptions.\n\n- Cross-cutting concerns that are not epics on their\
+  \ own. The RBAC change\n  is a manifest-level extension of an existing ClusterRole; the\n  admin-vs-viewer\
+  \ authorization tier is an acceptance dimension across the\n  UI epics; disconnected/air-gapped operation\
+  \ is a constraint plus a QE\n  validation activity. Watch for these being inflated into full epics,\
+  \ and\n  equally for the viewer/read-only tier (P1) disappearing entirely.\n\n- Scope discipline. The\
+  \ strategy has a long explicit out-of-scope list\n  (non-admin/data-scientist UI, workbench-notebook\
+  \ integration owned by a\n  separate strategy track, quality/drift monitoring, multi-tenant\n  namespace\
+  \ management, a permissions-management UI, a new BFF sidecar,\n  in-place editing). No epic should be\
+  \ created for any of these, and the\n  separate related strategy should be referenced as an out-of-scope\n\
+  \  boundary, not pulled in as a dependency to implement.\n\n- Sequencing. Dependencies listed are almost\
+  \ all \"exists today\", so the\n  DAG should be mostly parallel after a shared foundation (routes/RBAC/\n\
+  \  feature-flag scaffolding), with the P2 form-validation polish last or\n  deferred. A long serial\
+  \ chain across the independent UI pages would be\n  a false dependency.\n\n- Triage. This should NOT\
+  \ be triaged below-threshold or docs-only: it is a\n  multi-HLR, multi-team, M-sized feature with genuine\
+  \ implementation work.\n"
+
+# Canonical Jira component vocabulary shipped to this case as
+# .context/rhai-components.txt. Mirrored here because check judges only
+# receive outputs + annotations, and .context is provisioned input rather
+# than a collected output. Epic frontmatter 'component' must be one of these
+# (decompose-agent.md:61; submit.py validate_component strips anything else).
+valid_components:
+  - AI Core Dashboard
+  - AI Core Platform
+  - AI Core Platform Security
+  - AI Evaluations
+  - AI Guardrails
+  - AI Hub
+  - AI Navigator
+  - AI Pipelines
+  - AI Platform DevOps
+  - AI Research + Community
+  - AI Safety
+  - AI Safety Orchestration
+  - AI Testing + Workflow Validation
+  - AIPCC Ecosystems
+  - AIPCC Productization
+  - Accelerator Enablement
+  - AgentDev
+  - AgentOps
+  - Agentic
+  - AutoML
+  - AutoRAG
+  - Build and Release
+  - CI/CD
+  - Compressed-Tensors
+  - Customer Exploration & Test
+  - Data Connect Hub
+  - Data Processing
+  - DevOps
+  - Distributed Workloads
+  - Documentation
+  - Feature Store
+  - Fine Tuning
+  - Gen AI Studio
+  - IBM P
+  - IBM Z
+  - INFERENG Midstream
+  - Inference Extensions
+  - Inference Gateway
+  - Inference Research
+  - Inference-Time Techniques
+  - Infra Midstream
+  - InfraOps
+  - Integrations
+  - KubeRay
+  - Kubeflow Spark Operator
+  - Kubeflow Unified SDK
+  - LLM Compressor
+  - LlamaStack
+  - MLR Speculative Decoding
+  - MLflow
+  - Model Customization
+  - Model Runtimes
+  - Model Validation
+  - Model and Agent Observability
+  - Model as a Service
+  - Monitoring
+  - Notebooks
+  - Notebooks Extensions
+  - Notebooks Images
+  - Notebooks Server
+  - OCPMCPLO
+  - OGX Core
+  - OpenShift AI Productization
+  - Optimized Models
+  - PXE
+  - PerfScale
+  - Performance Infrastructure
+  - Performance Marketing
+  - Performance Research
+  - PyTorch
+  - QE
+  - RAG
+  - RAG + Vector DB
+  - RAG_Agentic
+  - Ray Training
+  - SDG
+  - Security
+  - Serving Orchestration
+  - Speculators
+  - TestOps
+  - Tooling Experience
+  - Training Hub
+  - Training Kubeflow
+  - UXD
+  - Wheel Building
+  - Wheel Package Index
+  - Workbenches/IDE
+  - Workload Orchestration
+  - llama.cpp
+  - llm-d
+  - vLLM
+  - vLLM Runtime
+  - watsonx Orchestrate Collaboration

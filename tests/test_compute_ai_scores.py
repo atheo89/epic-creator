@@ -117,3 +117,43 @@ class TestComputeForEpic:
             "investigation_signals": _inv(spec=1, src=1, run=1),  # +3 if mis-dispatched
         })
         assert cls == "Medium" and score == 1
+
+
+class TestBranchEpicGlob:
+    """compute_for_strategy must reach BRANCH-* epics: the 2026-08-19 eval's
+    case-007 shipped 7 of 8 conditional epics unscored because the old
+    {strat_id}-E*.md glob cannot match {strat_id}-BRANCH-A-E00N.md."""
+
+    EPIC = (
+        "---\n"
+        "epic_id: {eid}\n"
+        "title: T\n"
+        "parent_strat: RHAISTRAT-9007\n"
+        "component: Dashboard\n"
+        "team: t\n"
+        "type: Implementation\n"
+        "priority: P1\n"
+        "ai_signals:\n"
+        "  change_specificity: 1\n"
+        "---\n\nBody\n"
+    )
+
+    def test_branch_files_are_scored(self, tmp_dir):
+        from compute_ai_scores import compute_for_strategy
+        d = tmp_dir / "artifacts" / "epic-tasks"
+        d.mkdir(parents=True)
+        for name in ("RHAISTRAT-9007-E001",
+                     "RHAISTRAT-9007-BRANCH-A-E002",
+                     "RHAISTRAT-9007-BRANCH-B-E002"):
+            (d / f"{name}.md").write_text(self.EPIC.format(eid=name))
+        assert compute_for_strategy("RHAISTRAT-9007") == 3
+
+    def test_prefix_ids_do_not_cross_match(self, tmp_dir):
+        from compute_ai_scores import compute_for_strategy
+        d = tmp_dir / "artifacts" / "epic-tasks"
+        d.mkdir(parents=True)
+        (d / "RHAISTRAT-900-E001.md").write_text(
+            self.EPIC.format(eid="RHAISTRAT-900-E001"))
+        (d / "RHAISTRAT-9001-E001.md").write_text(
+            self.EPIC.format(eid="RHAISTRAT-9001-E001"))
+        assert compute_for_strategy("RHAISTRAT-900") == 1

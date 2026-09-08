@@ -1,0 +1,31 @@
+strat_id: RHAISTRAT-9011
+tier: synthetic
+notes: |
+  Parallelism probe: after the convention epic (HLR-1) lands, the seven
+  per-component adoption epics are explicitly independent — the strategy says
+  so. Expect a fan-out DAG: every adoption epic depends on the convention
+  epic and on nothing else; docs epic last. Serializing adoption epics behind
+  one another (a chain instead of a fan) is the specific dag-justification
+  failure this case probes. Boundary check: one adoption epic per
+  component/team, no mega-epic bundling multiple components. Component names
+  must come from .context/rhai-components.txt.
+
+# Canonical Jira component vocabulary shipped to this case as
+# .context/rhai-components.txt. Mirrored here because check judges only
+# receive outputs + annotations, and .context is provisioned input rather
+# than a collected output. Epic frontmatter 'component' must be one of these
+# (decompose-agent.md:61; submit.py validate_component strips anything else).
+valid_components:
+  - Dashboard
+  - Data Science Pipelines
+  - Distributed Workloads
+  - Documentation
+  - Feature Store
+  - KServe
+  - Llama Stack
+  - Model Registry
+  - Notebooks
+  - Platform Operator
+  - Serving Runtimes
+  - Training Operator
+  - TrustyAI

@@ -65,25 +65,52 @@ class TestCheckId:
         ):
             assert check_id("review_decomp", "RHAISTRAT-1") == "error"
 
-    def test_review_phase_unparseable(self, tmp_path):
-        """Review phase: unparseable frontmatter -> error."""
+    def test_review_phase_unparseable_is_pending(self, tmp_path):
+        """Review phase: unparseable frontmatter -> pending, not error.
+
+        The review agent writes the body first and sets frontmatter via
+        frontmatter.py seconds later; an unparseable file is mid-write.
+        Treating it as error released the wait-for-wave barrier early
+        (COMPLETED=0, ERRORS=1, pending=0 -> NEXT_POLL=0) in three cases of
+        the 2026-08-19 eval run while the reviewer was still writing.
+        """
         f = tmp_path / "RHAISTRAT-1-decomp-review.md"
         f.write_text("---\n: bad yaml [[\n---\nBody\n")
         with patch.dict(
             "check_decompose_progress.PHASE_CHECKS",
             {"review_decomp": lambda id: str(tmp_path / f"{id}-decomp-review.md")},
         ):
-            assert check_id("review_decomp", "RHAISTRAT-1") == "error"
+            assert check_id("review_decomp", "RHAISTRAT-1") == "pending"
 
-    def test_review_phase_empty_frontmatter(self, tmp_path):
-        """Review phase: empty frontmatter -> error."""
+    def test_review_phase_body_without_frontmatter_is_pending(self, tmp_path):
+        """Review phase: body-only file (the actual mid-write state) -> pending."""
+        f = tmp_path / "RHAISTRAT-1-decomp-review.md"
+        f.write_text("## Review Summary\n\nLooks good so far.\n")
+        with patch.dict(
+            "check_decompose_progress.PHASE_CHECKS",
+            {"review_decomp": lambda id: str(tmp_path / f"{id}-decomp-review.md")},
+        ):
+            assert check_id("review_decomp", "RHAISTRAT-1") == "pending"
+
+    def test_review_phase_empty_frontmatter_is_pending(self, tmp_path):
+        """Review phase: empty frontmatter -> pending (mid-write)."""
         f = tmp_path / "RHAISTRAT-1-decomp-review.md"
         f.write_text("---\n---\nBody\n")
         with patch.dict(
             "check_decompose_progress.PHASE_CHECKS",
             {"review_decomp": lambda id: str(tmp_path / f"{id}-decomp-review.md")},
         ):
-            assert check_id("review_decomp", "RHAISTRAT-1") == "error"
+            assert check_id("review_decomp", "RHAISTRAT-1") == "pending"
+
+    def test_revise_phase_unparseable_is_pending(self, tmp_path):
+        """Revise phase mirrors the same body-then-frontmatter pattern."""
+        f = tmp_path / "RHAISTRAT-1-decomposition.md"
+        f.write_text("---\n: bad yaml [[\n---\nBody\n")
+        with patch.dict(
+            "check_decompose_progress.PHASE_CHECKS",
+            {"revise_decomp": lambda id: str(tmp_path / f"{id}-decomposition.md")},
+        ):
+            assert check_id("revise_decomp", "RHAISTRAT-1") == "pending"
 
 
 class TestDecomposePhase:
@@ -180,7 +207,7 @@ class TestReviseDecompPhase:
         ):
             assert check_id("revise_decomp", "RHAISTRAT-1") == "pending"
 
-    def test_revised_bad_frontmatter_is_error(self, tmp_path):
+    def test_revised_bad_frontmatter_is_pending(self, tmp_path):
         """Unparseable frontmatter -> error."""
         f = tmp_path / "RHAISTRAT-1-decomposition.md"
         f.write_text("---\n: bad [[\n---\nBody\n")
@@ -188,9 +215,9 @@ class TestReviseDecompPhase:
             "check_decompose_progress.PHASE_CHECKS",
             {"revise_decomp": lambda id: str(tmp_path / f"{id}-decomposition.md")},
         ):
-            assert check_id("revise_decomp", "RHAISTRAT-1") == "error"
+            assert check_id("revise_decomp", "RHAISTRAT-1") == "pending"
 
-    def test_revised_empty_frontmatter_is_error(self, tmp_path):
+    def test_revised_empty_frontmatter_is_pending(self, tmp_path):
         """Empty frontmatter -> error."""
         f = tmp_path / "RHAISTRAT-1-decomposition.md"
         f.write_text("---\n---\nBody\n")
@@ -198,7 +225,7 @@ class TestReviseDecompPhase:
             "check_decompose_progress.PHASE_CHECKS",
             {"revise_decomp": lambda id: str(tmp_path / f"{id}-decomposition.md")},
         ):
-            assert check_id("revise_decomp", "RHAISTRAT-1") == "error"
+            assert check_id("revise_decomp", "RHAISTRAT-1") == "pending"
 
 
 # ── _check_phase ──

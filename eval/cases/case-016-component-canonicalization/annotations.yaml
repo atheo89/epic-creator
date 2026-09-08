@@ -1,0 +1,30 @@
+strat_id: RHAISTRAT-9016
+tier: synthetic
+notes: |
+  Component-canonicalization probe: the strategy deliberately uses informal
+  names — "RHOAI web console", "notebook controller", "Kubeflow Pipelines" —
+  including in its Affected Components section. Epic frontmatter component
+  values must be the canonical names from .context/rhai-components.txt:
+  Dashboard, Notebooks, Data Science Pipelines. Any epic carrying an informal
+  name verbatim as its component is the failure this case probes (it would
+  break downstream Jira submission, which validates against the same list).
+
+# Canonical Jira component vocabulary shipped to this case as
+# .context/rhai-components.txt. Mirrored here because check judges only
+# receive outputs + annotations, and .context is provisioned input rather
+# than a collected output. Epic frontmatter 'component' must be one of these
+# (decompose-agent.md:61; submit.py validate_component strips anything else).
+valid_components:
+  - Dashboard
+  - Data Science Pipelines
+  - Distributed Workloads
+  - Documentation
+  - Feature Store
+  - KServe
+  - Llama Stack
+  - Model Registry
+  - Notebooks
+  - Platform Operator
+  - Serving Runtimes
+  - Training Operator
+  - TrustyAI
