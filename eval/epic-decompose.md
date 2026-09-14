@@ -97,10 +97,10 @@ scripts, so it is intercepted at the Bash layer:
 
 - `scripts/fetch-architecture-context.sh` (GitHub) — neutralized via
   `execution.env: EPIC_SKIP_BOOTSTRAP=1` (script exits 0).
-- `scripts/fetch_components.py` (Jira `/project/RHAI/components`) — **no skip flag**; a
-  failure would hard-stop the pipeline ("bootstrap failed"). An `inputs.tools` entry
-  denies the call with a message that `.context/rhai-components.txt` is pre-provisioned
-  and bootstrap should be treated as successful.
+- `scripts/fetch_components.py` (Jira `/project/RHAI/components`) — neutralized via
+  `execution.env: EPIC_SKIP_COMPONENT_FETCH=1`, preserving the pre-provisioned
+  `.context/rhai-components.txt`. An `inputs.tools` entry also denies the call
+  defensively and tells the agent to treat bootstrap as successful.
 - `scripts/fetch_strategy.py` (Jira issue fetch) — normally never launched (file
   pre-provisioned); the same `inputs.tools` entry covers it defensively.
 

@@ -6,6 +6,8 @@ Writes the canonical component list to .context/rhai-components.txt
 decomposer prompt to constrain component selection, and by submit.py
 to validate before creating issues.
 
+Set EPIC_SKIP_COMPONENT_FETCH to preserve a pre-provisioned component list.
+
 Usage:
     python scripts/fetch_components.py
 """
@@ -41,8 +43,8 @@ def fetch_components(server, user, token):
 
 
 def main():
-    if os.environ.get("EPIC_SKIP_BOOTSTRAP"):
-        print("EPIC_SKIP_BOOTSTRAP set - skipping dependency bootstrapping step")
+    if os.environ.get("EPIC_SKIP_COMPONENT_FETCH"):
+        print("EPIC_SKIP_COMPONENT_FETCH set - skipping component fetch")
         return
 
     server, user, token = require_env()
