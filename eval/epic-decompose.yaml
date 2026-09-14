@@ -18,6 +18,7 @@ execution:
   max_budget_usd: 80.0     # runaway guard; quality budget is judged at $40 (budget_check)
   env:
     EPIC_SKIP_BOOTSTRAP: "1"   # scripts/fetch-architecture-context.sh exits 0 without cloning
+    EPIC_SKIP_COMPONENT_FETCH: "1"  # Preserve the case-provided component list
 
 runner:
   type: claude-code
